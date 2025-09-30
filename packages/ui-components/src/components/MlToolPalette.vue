@@ -160,6 +160,11 @@ const handleClose = () => {
 
 .ml-tool-palette-dialog-icon {
   border-bottom: 1px solid var(--el-border-color);
+  cursor: default; /* Override parent move cursor on icon */
+}
+
+.ml-tool-palette-dialog-icon:hover {
+  color: var(--el-color-primary);
 }
 
 .ml-tool-palette-dialog-layout {
