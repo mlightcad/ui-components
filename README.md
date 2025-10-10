@@ -9,7 +9,7 @@ The following components are included in this package.
 - Tool Palette: one dockable, resizable, and floating window, which is quite similar to AutoCAD Tool Palette.
 - Toolbar: one toolbar which can be easily customized by one array of button data. 
 
-You can play with them through [this live demo](https://mlight-lee.github.io/ui-components/).
+[**🌐 Live Demo**](https://mlightcad.gitlab.io/ui-components/).
 
 ### Tool Palette
 

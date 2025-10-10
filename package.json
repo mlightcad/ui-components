@@ -1,12 +1,12 @@
 {
   "name": "element-plus-vite-starter",
   "version": "0.1.0",
-  "description": "One common UI component library based on Element Plus",
+  "description": "One common UI component library based on Element Plus for web-based CAD",
   "license": "MIT",
   "author": "MLight Lee <mlight.lee@outlook.com>",
   "repository": {
     "type": "git",
-    "url": "git://github.com/mlight-lee/ui-components"
+    "url": "https://gitlab.com/mlightcad/ui-components"
   },
   "keywords": [
     "ui",
