@@ -33,6 +33,10 @@ interface Props {
    */
   title?: string
   /**
+   * Array of tab definitions. If provided, the tool palette will display tabs.
+   */
+  tabs?: MlToolPaletteTab[]
+  /**
    * The minimum distance from the left side of the tool palette to the left side of the window
    */
   leftOffset?: number
@@ -51,7 +55,31 @@ interface Props {
 }
 ```
 
+Tabs in tool palette are described by the following data structure.
+
+```javascript
+/**
+ * Tab definition for tool palette
+ */
+export interface MlToolPaletteTab {
+  /**
+   * Unique name identifier for the tab
+   */
+  name: string
+  /**
+   * Display label for the tab
+   */
+  label: string
+  /**
+   * Title to display in the title bar when this tab is active
+   */
+  title?: string
+}
+```
+
 Four `offsetXXX` properties are used to set the minimum distance from the side of the tool palette to the side of the window. It is quite useful if you want the tool palette is shown within certain area. For example, one web page has one title bar at the top of window, one status bar at the bottom of window, and one canvas area between the title bar and the status bar. The height of the title bar is 60px and the height of the status bar is 20px. Then you can set `topOffset` to 60 and `bottomOffset` to 20 to let the tool palette are shown and moved within canvas area only. 
+
+#### Basic Usage
 
 ```javascript
 <script lang="ts" setup>
@@ -79,6 +107,119 @@ const toolPaletteVisible = ref<boolean>(false)
 }
 </style>
 ```
+
+#### Using Tabs
+
+Tool Palette supports multiple tabs to organize different content. Each tab can have its own content and title. When a tab becomes active, its `title` (if provided) will be displayed in the title bar of the tool palette.
+
+```javascript
+<script lang="ts" setup>
+import { MlToolPalette, MlToolPaletteTab } from '@mlightcad/ui-components'
+import { ref, reactive } from 'vue'
+
+const toolPaletteVisible = ref<boolean>(true)
+const activeTab = ref<string>('blocks')
+
+const tabs = reactive<MlToolPaletteTab[]>([
+  {
+    name: 'blocks',
+    label: 'Blocks',
+    title: 'Blocks Palette'
+  },
+  {
+    name: 'hatches',
+    label: 'Hatches',
+    title: 'Hatches Palette'
+  },
+  {
+    name: 'tools',
+    label: 'Tools',
+    title: 'Custom Tools'
+  }
+])
+
+const handleTabChange = (tabName: string) => {
+  console.log('Tab changed to:', tabName)
+}
+
+const handleTabClose = (tabName: string) => {
+  console.log('Tab closed:', tabName)
+  const index = tabs.findIndex(t => t.name === tabName)
+  if (index >= 0) {
+    tabs.splice(index, 1)
+    // If the closed tab was active, switch to another tab
+    if (activeTab.value === tabName && tabs.length > 0) {
+      activeTab.value = tabs[0].name
+    }
+  }
+}
+</script>
+
+<template>
+  <ml-tool-palette
+    class="tool-palette"
+    v-model="toolPaletteVisible"
+    v-model:active-tab="activeTab"
+    title="Tool Palette"
+    :tabs="tabs"
+    :top-offset="60"
+    :bottom-offset="20"
+    @tab-change="handleTabChange"
+    @tab-close="handleTabClose"
+  >
+    <template #tab-blocks>
+      <div class="tab-content">
+        <h3>Blocks</h3>
+        <p>This is the Blocks tab content.</p>
+        <el-button>Block 1</el-button>
+        <el-button>Block 2</el-button>
+      </div>
+    </template>
+    <template #tab-hatches>
+      <div class="tab-content">
+        <h3>Hatches</h3>
+        <p>This is the Hatches tab content.</p>
+        <el-button>Hatch Pattern 1</el-button>
+        <el-button>Hatch Pattern 2</el-button>
+      </div>
+    </template>
+    <template #tab-tools>
+      <div class="tab-content">
+        <h3>Custom Tools</h3>
+        <p>This is the Tools tab content.</p>
+        <el-button>Custom Tool 1</el-button>
+        <el-button>Custom Tool 2</el-button>
+      </div>
+    </template>
+  </ml-tool-palette>
+</template>
+
+<style scoped>
+.tool-palette {
+  position: fixed;
+  top: 55px;
+  width: 400px;
+  height: 500px;
+}
+
+.tab-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+</style>
+```
+
+**Tab Features:**
+- **Closeable tabs**: Each tab has a close icon that can be clicked to close the tab
+- **Active tab title**: When a tab is active, its `title` property (if provided) is displayed in the title bar
+- **Tab switching**: Use `v-model:active-tab` to control which tab is active
+- **Tab events**: 
+  - `@tab-change`: Emitted when the active tab changes
+  - `@tab-close`: Emitted when a tab is closed
+- **Tab content**: Use named slots `#tab-{name}` to provide content for each tab
+- **Overflow handling**: When there are many tabs, Element Plus automatically handles overflow with a dropdown menu
 
 ### Toolbar
 

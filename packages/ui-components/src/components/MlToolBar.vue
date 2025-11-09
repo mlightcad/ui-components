@@ -121,11 +121,13 @@ const handleCommand = (command: string) => {
 .ml-vertical-toolbar-button-group {
   display: flex;
   flex-direction: column;
+  background-color: var(--el-fill-color);
 }
 
 .ml-horizontal-toolbar-button-group {
   display: flex;
   flex-direction: row;
+  background-color: var(--el-fill-color);
 }
 
 .ml-toolbar-button {

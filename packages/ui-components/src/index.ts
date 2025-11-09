@@ -17,6 +17,7 @@ export {
 export type { MlDropdownMenuItem } from './components/MlDropdown.vue'
 export type { MlToggleButtonData } from './components/MlToggleButton.vue'
 export type { MlButtonData } from './components/MlToolBar.vue'
+export type { MlToolPaletteTab } from './components/MlToolPalette.vue'
 export * from './components/types'
 
 // Optionally, export them as a plugin for Vue

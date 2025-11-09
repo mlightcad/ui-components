@@ -27,7 +27,7 @@
     "lint": "nx run-many -t lint",
     "lint:fix": "nx run-many -t lint:fix",
     "typecheck": "nx run-many -t typecheck",
-    "publish": "pnpm lint clean && pnpm publish --filter ui-components --access public --no-git-checks"
+    "publish-components": "pnpm publish --filter ui-components --access public --no-git-checks"
   },
   "devDependencies": {
     "@iconify-json/ep": "^1.1.15",
