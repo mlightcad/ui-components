@@ -31,7 +31,7 @@
     "@mlightcad/ui-components": "workspace:*",
     "@element-plus/icons-vue": "^2.3.1",
     "@vueuse/core": "^11.1.0",
-    "element-plus": "^2.8.1",
+    "element-plus": "^2.12.0",
     "vue": "^3.4.21"
   }
 }

@@ -1,12 +1,12 @@
 {
   "name": "@mlightcad/ui-components",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "One common UI component library based on Element Plus for web-based CAD",
   "license": "MIT",
   "author": "MLight Lee <mlight.lee@outlook.com>",
   "repository": {
     "type": "git",
-    "url": "https://gitlab.com/mlightcad/ui-components"
+    "url": "https://github.com/mlightcad/ui-components"
   },
   "keywords": [
     "ui",
@@ -43,7 +43,7 @@
     "rollup-plugin-peer-deps-external": "^2.2.4"
   },
   "peerDependencies": {
-    "element-plus": "^2.8.1",
+    "element-plus": "^2.12.0",
     "vue": "^3.4.21"
   }
 }
