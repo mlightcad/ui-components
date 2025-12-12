@@ -1,16 +1,25 @@
 <template>
+  <!-- Main tool palette container -->
   <div
     ref="toolPaletteElement"
     :style="[resizedStyle]"
     class="ml-tool-palette-dialog"
     v-if="visible"
+    :class="{ 'ml-tool-palette-disabled': disabled }"
   >
+    <!-- Layout container for title bar and content -->
     <div class="ml-tool-palette-dialog-layout" :class="orientation">
-      <div ref="titleBarElement" class="ml-tool-palette-title-bar" :style="titleBarBorderStyle">
+      <!-- Title bar with close button, collapse toggle, and title -->
+      <div
+        ref="titleBarElement"
+        class="ml-tool-palette-title-bar"
+        :style="titleBarBorderStyle"
+      >
+        <!-- Close button (disabled when component is disabled) -->
         <el-icon
           :size="18"
           class="ml-tool-palette-dialog-icon"
-          @click="handleClose"
+          @click="!disabled && handleClose()"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -24,21 +33,29 @@
             />
           </svg>
         </el-icon>
+
+        <!-- Collapse toggle (disabled when component is disabled) -->
         <ml-collapse
           class="ml-tool-palette-dialog-icon"
           v-model="collapsed"
           :reverse="reversed"
+          :disabled="disabled"
         />
+
+        <!-- Displayed title of the tool palette -->
         <span class="ml-tool-palette-title">{{ displayedTitle }}</span>
       </div>
+
+      <!-- Main content area -->
       <div class="ml-tool-palette-content">
+        <!-- Tabs if provided -->
         <el-tabs
           v-if="hasTabs"
           v-model="activeTab"
           type="border-card"
           class="ml-tool-palette-tabs"
-          @tab-remove="handleTabClose"
-          @tab-change="handleTabChange"
+          @tab-remove="!disabled && handleTabClose"
+          @tab-change="!disabled && handleTabChange"
         >
           <el-tab-pane
             v-for="tab in props.tabs"
@@ -52,6 +69,8 @@
             <slot :name="`tab-${tab.name}`" />
           </el-tab-pane>
         </el-tabs>
+
+        <!-- Default slot content if no tabs -->
         <div v-else class="ml-tool-palette-default-content">
           <slot></slot>
         </div>
@@ -114,8 +133,11 @@ interface Props {
    * The minimum distance from the bottom side of the tool palette to the bottom side of the window
    */
   bottomOffset?: number
+  /** Disable all interactions for this component */
+  disabled?: boolean
 }
 
+/** Events emitted by the tool palette */
 interface Events {
   /**
    * Trigger this event when the tool palette closed.
@@ -141,7 +163,8 @@ const props = withDefaults(defineProps<Props>(), {
   leftOffset: 0,
   rightOffset: 0,
   topOffset: 0,
-  bottomOffset: 0
+  bottomOffset: 0,
+  disabled: false
 })
 // Flag to control whether the tool palette is visible
 const visible = defineModel({ default: true })
@@ -156,17 +179,26 @@ const hasTabs = computed(() => {
 
 // Initialize active tab to first tab if tabs are provided and no active tab is set
 onMounted(() => {
-  if (hasTabs.value && !activeTab.value && props.tabs && props.tabs.length > 0) {
+  if (
+    hasTabs.value &&
+    !activeTab.value &&
+    props.tabs &&
+    props.tabs.length > 0
+  ) {
     activeTab.value = props.tabs[0].name
   }
 })
 
 // Watch for tabs prop changes and initialize active tab if needed
-watch(() => props.tabs, (newTabs: MlToolPaletteTab[] | undefined) => {
-  if (newTabs && newTabs.length > 0 && !activeTab.value) {
-    activeTab.value = newTabs[0].name
-  }
-}, { immediate: true })
+watch(
+  () => props.tabs,
+  (newTabs: MlToolPaletteTab[] | undefined) => {
+    if (newTabs && newTabs.length > 0 && !activeTab.value) {
+      activeTab.value = newTabs[0].name
+    }
+  },
+  { immediate: true }
+)
 
 // This varible is used in CSS
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -178,55 +210,49 @@ const titleBarElement = ref<HTMLElement | null>(null)
 // Reference to tool palette HTML element
 const toolPaletteElement = ref<HTMLElement | null>(null)
 
-const dragOptions = computed<DragOptions>(() => {
-  return {
-    offset: ref({
-      left: props.leftOffset,
-      right: props.rightOffset,
-      top: props.topOffset,
-      bottom: props.bottomOffset
-    })
-  }
-})
+// Drag options
+const dragOptions = computed<DragOptions>(() => ({
+  offset: ref({
+    left: props.leftOffset,
+    right: props.rightOffset,
+    top: props.topOffset,
+    bottom: props.bottomOffset
+  })
+}))
+
+// Compute bounding rect and orientation for layout
 const {
   rect: toolPaletteRect,
   orientation,
   reversed
 } = useBoundingRect(toolPaletteElement, titleBarElement, collapsed, dragOptions)
 
-// Resized style
-const resizedStyle = computed(() => {
-  return {
-    left: `${toolPaletteRect.value.left}px`,
-    top: `${toolPaletteRect.value.top}px`,
-    width: `${toolPaletteRect.value.width}px`,
-    height: `${toolPaletteRect.value.height}px`
-  }
-})
+// Resized style for container
+const resizedStyle = computed(() => ({
+  left: `${toolPaletteRect.value.left}px`,
+  top: `${toolPaletteRect.value.top}px`,
+  width: `${toolPaletteRect.value.width}px`,
+  height: `${toolPaletteRect.value.height}px`
+}))
 
-const titleBarBorderStyle = computed(() => {
-  return reversed.value ? {
-    borderLeft: '1px solid var(--el-border-color)',
-    borderRight: null
-  } : {
-    borderLeft: null,
-    borderRight: '1px solid var(--el-border-color)'
-  }
-})
+// Border style for title bar based on reversed orientation
+const titleBarBorderStyle = computed(() =>
+  reversed.value
+    ? { borderLeft: '1px solid var(--el-border-color)', borderRight: null }
+    : { borderLeft: null, borderRight: '1px solid var(--el-border-color)' }
+)
 
-// Compute the title to display in the title bar
+// Compute the displayed title (from active tab or component title)
 const displayedTitle = computed(() => {
   // If tabs are provided and there's an active tab, use the active tab's title
   if (hasTabs.value && activeTab.value && props.tabs) {
     const activeTabData = props.tabs.find(tab => tab.name === activeTab.value)
-    if (activeTabData && activeTabData.title) {
-      return activeTabData.title
-    }
+    if (activeTabData?.title) return activeTabData.title
   }
-  // Otherwise, use the component's title prop
   return props.title
 })
 
+// Close tool palette
 const handleClose = () => {
   visible.value = false
   const element = toolPaletteElement.value
@@ -236,28 +262,25 @@ const handleClose = () => {
   })
 }
 
-// Handle tab change
+// Tab change handler
 const handleTabChange = (tabName: string) => {
   emit('tab-change', tabName)
 }
 
-// Handle tab close
+// Tab close handler
 const handleTabClose = (tabName: string) => {
   emit('tab-close', tabName)
-  
-  // If closing the active tab, switch to another tab
+
+  // Switch to another tab if active tab is closed
   if (activeTab.value === tabName && props.tabs) {
     const currentIndex = props.tabs.findIndex(t => t.name === tabName)
     if (currentIndex >= 0) {
-      // Try to switch to next tab, or previous if at the end
-      const nextTab = props.tabs[currentIndex + 1] || props.tabs[currentIndex - 1]
-      if (nextTab) {
-        activeTab.value = nextTab.name
-      }
+      const nextTab =
+        props.tabs[currentIndex + 1] || props.tabs[currentIndex - 1]
+      if (nextTab) activeTab.value = nextTab.name
     }
   }
 }
-
 </script>
 
 <style scoped>
@@ -270,9 +293,15 @@ const handleTabClose = (tabName: string) => {
   border: 1px solid var(--el-border-color);
 }
 
+/* Disabled overlay to prevent interactions */
+.ml-tool-palette-disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .ml-tool-palette-dialog-icon {
   border-bottom: 1px solid var(--el-border-color);
-  cursor: default; /* Override parent move cursor on icon */
+  cursor: default;
 }
 
 .ml-tool-palette-dialog-icon:hover {
@@ -289,8 +318,8 @@ const handleTabClose = (tabName: string) => {
   display: flex;
   justify-content: left;
   align-items: center;
-  cursor: move; /* Draggable cursor on the left part */
-  writing-mode: vertical-rl; /* Vertically align the text */
+  cursor: move;
+  writing-mode: vertical-rl;
   text-align: center;
   background-color: var(--el-fill-color);
 }
@@ -361,16 +390,14 @@ const handleTabClose = (tabName: string) => {
 .ml-tool-palette-dialog-layout.left .ml-tool-palette-title-bar {
   order: 1;
 }
-
 .ml-tool-palette-dialog-layout.left .ml-tool-palette-content {
   order: 2;
 }
 
-/* When direction is 'right' */
+/* Right orientation */
 .ml-tool-palette-dialog-layout.right .ml-tool-palette-title-bar {
   order: 2;
 }
-
 .ml-tool-palette-dialog-layout.right .ml-tool-palette-content {
   order: 1;
 }

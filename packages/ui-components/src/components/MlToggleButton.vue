@@ -54,7 +54,7 @@ interface Events {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  size: 30,
+  size: 30
 })
 const on = defineModel({ default: false })
 const emit = defineEmits<Events>()

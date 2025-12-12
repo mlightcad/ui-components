@@ -11,6 +11,7 @@ import { reactive } from 'vue'
 
 import { toggleDark } from '~/composables'
 
+const dialogVisible = ref(false)
 const toolPaletteVisible = ref<boolean>(true)
 const activeTab = ref<string>('blocks')
 const data = reactive<MlDropdownMenuItem[]>([
@@ -62,7 +63,7 @@ const handleToolPalette = () => {
 }
 
 const handleClicked = () => {
-  console.log('Button clicked!')
+  dialogVisible.value = true
 }
 
 const handleTabChange = (tabName: string) => {
@@ -119,6 +120,23 @@ const handleTabClose = (tabName: string) => {
         <el-button @click="handleClicked">Block 2</el-button>
         <el-button @click="handleClicked">Block 3</el-button>
       </div>
+      <el-dialog
+        v-model="dialogVisible"
+        title="Tips"
+        width="400"
+        center
+        draggable
+      >
+        <span>This is a message</span>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="dialogVisible = false">Cancel</el-button>
+            <el-button type="primary" @click="dialogVisible = false">
+              Confirm
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
     </template>
     <template #tab-hatches>
       <div class="tool-palette-tab-content">

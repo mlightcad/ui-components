@@ -1,5 +1,6 @@
 {
-  "name": "element-plus-vite-starter",
+  "name": "mlightcad",
+  "private": true,
   "version": "0.1.0",
   "description": "One common UI component library based on Element Plus for web-based CAD",
   "license": "MIT",

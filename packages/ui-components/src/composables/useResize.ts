@@ -53,9 +53,9 @@ export function useResize(
       const offsetY = event.clientY - rect.top
 
       // Check if the mouse is near the borders or the corner
-      const nearLeft = offsetX <= resizeThreshold
-      const nearRight = offsetX >= rect.width - resizeThreshold
-      const nearBottom = offsetY >= rect.height - resizeThreshold
+      const nearLeft = Math.abs(offsetX) <= resizeThreshold
+      const nearRight = Math.abs(rect.width - offsetX) <= resizeThreshold
+      const nearBottom = Math.abs(rect.height - offsetY) <= resizeThreshold
 
       // Set the resize cursor based on the position
       if (nearLeft && nearBottom && reverse.value) {
