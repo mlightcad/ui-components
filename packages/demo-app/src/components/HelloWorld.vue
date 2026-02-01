@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { Delete, Edit, Search } from '@element-plus/icons-vue'
+import {
+  CopyDocument,
+  Delete,
+  DocumentChecked,
+  Edit,
+  Scissor,
+  Search,
+  ZoomIn,
+  ZoomOut
+} from '@element-plus/icons-vue'
 import {
   MlButtonData,
   MlStatusBar,
@@ -15,23 +24,78 @@ import fullScreen from '../svgs/full-screen.svg'
 const { isFullscreen, toggle } = useFullscreen()
 
 const toolBarData = reactive<MlButtonData[]>([
+  /**
+   * =========================
+   * Edit (has sub toolbar)
+   * =========================
+   */
   {
     icon: markRaw(Edit),
     text: 'Edit',
-    command: 'edit',
-    description: 'This is description for edit button'
+    description: 'Edit related operations',
+    children: [
+      {
+        icon: markRaw(CopyDocument),
+        text: 'Copy',
+        command: 'edit.copy',
+        description: 'Copy selected entities'
+      },
+      {
+        icon: markRaw(Scissor),
+        text: 'Cut',
+        command: 'edit.cut',
+        description: 'Cut selected entities'
+      },
+      {
+        icon: markRaw(DocumentChecked),
+        text: 'Paste',
+        command: 'edit.paste',
+        description: 'Paste from clipboard'
+      }
+    ]
   },
+
+  /**
+   * =========================
+   * Delete (single action)
+   * =========================
+   */
   {
     icon: markRaw(Delete),
     text: 'Delete',
     command: 'delete',
-    description: 'This is description for delete button'
+    description: 'Delete selected entities'
   },
+
+  /**
+   * =========================
+   * Search / Zoom (has sub toolbar)
+   * =========================
+   */
   {
     icon: markRaw(Search),
     text: 'Search',
-    command: 'search',
-    description: 'This is description for search button'
+    description: 'Search & navigation tools',
+    children: [
+      {
+        icon: markRaw(Search),
+        text: 'Find',
+        command: 'search.find',
+        description: 'Find entities by property'
+      },
+      {
+        icon: markRaw(ZoomIn),
+        text: 'Zoom In',
+        command: 'view.zoomIn',
+        description: 'Zoom in drawing'
+      },
+      {
+        icon: markRaw(ZoomOut),
+        text: 'Zoom Out',
+        command: 'view.zoomOut',
+        description: 'Zoom out drawing'
+      }
+    ]
   }
 ])
 

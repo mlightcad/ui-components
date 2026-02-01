@@ -1,27 +1,89 @@
 <template>
-  <el-button-group :class="buttonGroupClass">
-    <el-tooltip
-      v-for="(item, index) in items"
-      :key="item.text"
-      :content="buttonTooltip(item)"
-      :hide-after="0"
-    >
-      <el-button
-        class="ml-toolbar-button"
-        :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
-        :key="index"
-        @click="handleCommand(item.command)"
+  <el-button-group class="ml-toolbar-group" :direction="direction">
+    <template v-for="(item, index) in items" :key="index">
+      <el-popover
+        v-if="item.children?.length"
+        trigger="hover"
+        :placement="popoverPlacement"
+        :show-arrow="true"
+        :teleported="true"
+        :popper-style="{
+          minWidth: getSubToolbarMinWidth(item) + 'px',
+          maxWidth: getSubToolbarMaxWidth(item) + 'px',
+          '--el-popover-padding': '0px',
+          '--el-popover-border-width': '0px',
+          '--el-popover-border-color': 'transparent'
+        }"
       >
-        <div>
+        <!-- Sub toolbar -->
+        <el-button-group class="ml-sub-toolbar-group" :direction="direction">
+          <el-tooltip
+            v-for="(child, cIndex) in item.children"
+            :key="cIndex"
+            :content="buttonTooltip(child)"
+            :show-after="1000"
+            :hide-after="0"
+          >
+            <el-button
+              class="ml-toolbar-button"
+              :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
+              @click="handleCommand(child.command)"
+            >
+              <el-icon :size="buttonIconSize">
+                <component :is="child.icon" />
+              </el-icon>
+              <div v-if="isShowButtonText" class="ml-toolbar-button-text">
+                {{ child.text }}
+              </div>
+            </el-button>
+          </el-tooltip>
+        </el-button-group>
+
+        <!-- Reference -->
+        <template #reference>
+          <el-button
+            class="ml-toolbar-button"
+            :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
+          >
+            <el-tooltip
+              :content="buttonTooltip(item)"
+              :show-after="1000"
+              :hide-after="0"
+            >
+              <div>
+                <el-icon :size="buttonIconSize">
+                  <component :is="item.icon" />
+                </el-icon>
+                <div v-if="isShowButtonText" class="ml-toolbar-button-text">
+                  {{ item.text }}
+                </div>
+              </div>
+            </el-tooltip>
+          </el-button>
+        </template>
+      </el-popover>
+
+      <!-- ================= Normal button ================= -->
+      <el-tooltip
+        v-else
+        :content="buttonTooltip(item)"
+        :show-after="1000"
+        :hide-after="0"
+      >
+        <el-button
+          class="ml-toolbar-button"
+          :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
+          @click="handleCommand(item.command)"
+        >
           <el-icon :size="buttonIconSize">
             <component :is="item.icon" />
           </el-icon>
           <div v-if="isShowButtonText" class="ml-toolbar-button-text">
             {{ item.text }}
           </div>
-        </div>
-      </el-button>
-    </el-tooltip>
+        </el-button>
+      </el-tooltip>
+    </template>
   </el-button-group>
 </template>
 
@@ -50,6 +112,10 @@ export interface MlButtonData {
    * Tooltips content when hover
    */
   description?: string
+  /**
+   * Sub toolbar data. If this property is set, the button will have a sub toolbar.
+   */
+  children?: MlButtonData[]
 }
 
 /**
@@ -77,57 +143,52 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'large',
-  layout: 'horizontal'
+  direction: 'horizontal'
 })
 
-const emit = defineEmits({
-  click: null
-})
+const emit = defineEmits<{
+  (e: 'click', command?: string): void
+}>()
 
-const buttonGroupClass = computed(() => {
-  return props.direction === 'vertical'
-    ? 'ml-vertical-toolbar-button-group'
-    : 'ml-horizontal-toolbar-button-group'
-})
-
-const buttonIconSize = computed(() => {
-  return props.size === 'small' ? 20 : 30
-})
+const buttonIconSize = computed(() => (props.size === 'small' ? 20 : 30))
 
 const buttonSize = computed(() => {
-  switch (props.size) {
-    case 'small':
-      return 30
-    case 'medium':
-      return 50
-  }
+  if (props.size === 'small') return 30
+  if (props.size === 'medium') return 50
   return 70
 })
 
-const buttonTooltip = (item: MlButtonData) => {
-  return item.description ? item.description : item.text
+const isShowButtonText = computed(() => props.size === 'large')
+
+const buttonTooltip = (item: MlButtonData) => item.description ?? item.text
+
+const handleCommand = (command?: string) => {
+  if (command) emit('click', command)
 }
 
-const isShowButtonText = computed(() => {
-  return props.size === 'large'
-})
+const popoverPlacement = computed(() =>
+  props.direction === 'vertical' ? 'right-start' : 'bottom-start'
+)
 
-const handleCommand = (command: string) => {
-  emit('click', command)
+const getSubToolbarMinWidth = (item: MlButtonData) => {
+  return props.direction === 'horizontal' && item.children
+    ? item.children.length * buttonSize.value
+    : buttonSize.value
+}
+
+const getSubToolbarMaxWidth = (item: MlButtonData) => {
+  return props.direction === 'vertical' && item.children ? buttonSize.value : 0
 }
 </script>
 
 <style scoped>
-.ml-vertical-toolbar-button-group {
-  display: flex;
-  flex-direction: column;
+.ml-toolbar-group {
   background-color: var(--el-fill-color);
 }
 
-.ml-horizontal-toolbar-button-group {
-  display: flex;
-  flex-direction: row;
-  background-color: var(--el-fill-color);
+.ml-sub-toolbar-group {
+  background-color: var(--el-bg-color);
+  border-radius: 4px;
 }
 
 .ml-toolbar-button {
@@ -139,7 +200,6 @@ const handleCommand = (command: string) => {
 }
 
 .ml-toolbar-button-text {
-  margin-left: 0px;
   margin-top: 5px;
 }
 </style>
