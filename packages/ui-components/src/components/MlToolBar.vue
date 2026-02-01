@@ -29,11 +29,13 @@
               :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
               @click="handleCommand(child.command)"
             >
-              <el-icon :size="buttonIconSize">
-                <component :is="child.icon" />
-              </el-icon>
-              <div v-if="isShowButtonText" class="ml-toolbar-button-text">
-                {{ child.text }}
+              <div>
+                <el-icon :size="buttonIconSize">
+                  <component :is="child.icon" />
+                </el-icon>
+                <div v-if="isShowButtonText" class="ml-toolbar-button-text">
+                  {{ child.text }}
+                </div>
               </div>
             </el-button>
           </el-tooltip>
@@ -75,11 +77,13 @@
           :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
           @click="handleCommand(item.command)"
         >
-          <el-icon :size="buttonIconSize">
-            <component :is="item.icon" />
-          </el-icon>
-          <div v-if="isShowButtonText" class="ml-toolbar-button-text">
-            {{ item.text }}
+          <div>
+            <el-icon :size="buttonIconSize">
+              <component :is="item.icon" />
+            </el-icon>
+            <div v-if="isShowButtonText" class="ml-toolbar-button-text">
+              {{ item.text }}
+            </div>
           </div>
         </el-button>
       </el-tooltip>
@@ -188,7 +192,6 @@ const getSubToolbarMaxWidth = (item: MlButtonData) => {
 
 .ml-sub-toolbar-group {
   background-color: var(--el-bg-color);
-  border-radius: 4px;
 }
 
 .ml-toolbar-button {
