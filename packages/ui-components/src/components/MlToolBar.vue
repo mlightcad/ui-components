@@ -1,9 +1,11 @@
 <template>
   <el-button-group class="ml-toolbar-group" :direction="direction">
     <template v-for="(item, index) in items" :key="index">
+      <!-- ================= Button with sub toolbar ================= -->
       <el-popover
         v-if="item.children?.length"
-        trigger="hover"
+        :visible="activePopoverIndex === index"
+        trigger="manual"
         :placement="popoverPlacement"
         :show-arrow="true"
         :teleported="true"
@@ -14,9 +16,16 @@
           '--el-popover-border-width': '0px',
           '--el-popover-border-color': 'transparent'
         }"
+        @mouseenter="openPopover(index)"
+        @mouseleave="closePopover"
       >
         <!-- Sub toolbar -->
-        <el-button-group class="ml-sub-toolbar-group" :direction="direction">
+        <el-button-group
+          class="ml-sub-toolbar-group"
+          :direction="direction"
+          @mouseenter="openPopover(index)"
+          @mouseleave="closePopover"
+        >
           <el-tooltip
             v-for="(child, cIndex) in item.children"
             :key="cIndex"
@@ -27,7 +36,7 @@
             <el-button
               class="ml-toolbar-button"
               :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
-              @click="handleCommand(child.command)"
+              @click="handleSubCommand(child.command)"
             >
               <div>
                 <el-icon :size="buttonIconSize">
@@ -46,6 +55,8 @@
           <el-button
             class="ml-toolbar-button"
             :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
+            @mouseenter="openPopover(index)"
+            @mouseleave="closePopover"
           >
             <el-tooltip
               :content="buttonTooltip(item)"
@@ -92,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import { MlIconType } from './types'
 
@@ -166,8 +177,23 @@ const isShowButtonText = computed(() => props.size === 'large')
 
 const buttonTooltip = (item: MlButtonData) => item.description ?? item.text
 
+const activePopoverIndex = ref<number | null>(null)
+
+const openPopover = (index: number) => {
+  activePopoverIndex.value = index
+}
+
+const closePopover = () => {
+  activePopoverIndex.value = null
+}
+
 const handleCommand = (command?: string) => {
   if (command) emit('click', command)
+}
+
+const handleSubCommand = (command?: string) => {
+  if (command) emit('click', command)
+  closePopover() // 👈 hide sub toolbar after click
 }
 
 const popoverPlacement = computed(() =>
