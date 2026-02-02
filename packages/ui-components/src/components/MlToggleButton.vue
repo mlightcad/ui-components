@@ -5,9 +5,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue'
-
-import { MlIconType } from './types'
+import { Component, computed } from 'vue'
 
 /**
  * Data to descibe toggle button
@@ -16,11 +14,11 @@ export interface MlToggleButtonData {
   /**
    * Icon used when button is 'on'
    */
-  onIcon: MlIconType
+  onIcon: Component
   /**
    * Icon used when button is 'off'.
    */
-  offIcon: MlIconType
+  offIcon: Component
   /**
    * Tooltip when button is 'on'
    */

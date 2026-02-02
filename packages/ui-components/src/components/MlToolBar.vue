@@ -1,9 +1,11 @@
 <template>
   <el-button-group class="ml-toolbar-group" :direction="direction">
     <template v-for="(item, index) in items" :key="index">
+      <!-- ================= Button with sub toolbar ================= -->
       <el-popover
         v-if="item.children?.length"
-        trigger="hover"
+        :visible="activePopoverIndex === index"
+        trigger="manual"
         :placement="popoverPlacement"
         :show-arrow="true"
         :teleported="true"
@@ -14,20 +16,28 @@
           '--el-popover-border-width': '0px',
           '--el-popover-border-color': 'transparent'
         }"
+        @mouseenter="openPopover(index)"
+        @mouseleave="closePopover"
       >
         <!-- Sub toolbar -->
-        <el-button-group class="ml-sub-toolbar-group" :direction="direction">
+        <el-button-group
+          class="ml-sub-toolbar-group"
+          :direction="direction"
+          @mouseenter="openPopover(index)"
+          @mouseleave="closePopover"
+        >
           <el-tooltip
             v-for="(child, cIndex) in item.children"
             :key="cIndex"
             :content="buttonTooltip(child)"
+            :auto-close="3000"
             :show-after="1000"
             :hide-after="0"
           >
             <el-button
               class="ml-toolbar-button"
               :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
-              @click="handleCommand(child.command)"
+              @click="handleSubCommand(child.command)"
             >
               <div>
                 <el-icon :size="buttonIconSize">
@@ -46,9 +56,12 @@
           <el-button
             class="ml-toolbar-button"
             :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
+            @mouseenter="openPopover(index)"
+            @mouseleave="closePopover"
           >
             <el-tooltip
               :content="buttonTooltip(item)"
+              :auto-close="3000"
               :show-after="1000"
               :hide-after="0"
             >
@@ -69,6 +82,7 @@
       <el-tooltip
         v-else
         :content="buttonTooltip(item)"
+        :auto-close="3000"
         :show-after="1000"
         :hide-after="0"
       >
@@ -92,9 +106,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { Component, computed, ref } from 'vue'
 
-import { MlIconType } from './types'
+type VerticalPlacement =
+  | 'left'
+  | 'left-start'
+  | 'left-end'
+  | 'right'
+  | 'right-start'
+  | 'right-end'
+
+type HorizontalPlacement =
+  | 'top'
+  | 'top-start'
+  | 'top-end'
+  | 'bottom'
+  | 'bottom-start'
+  | 'bottom-end'
 
 /**
  * Data to descibe button appearance
@@ -103,7 +131,7 @@ export interface MlButtonData {
   /**
    * Icon represented by one vue component
    */
-  icon: MlIconType
+  icon: Component
   /**
    * Text shown below icon
    */
@@ -143,6 +171,12 @@ interface Props {
    * - horizontal: arrange button horizontally
    */
   direction?: 'vertical' | 'horizontal'
+  /**
+   * Placement of sub toolbar (popover)
+   * - vertical toolbar: left / right variants
+   * - horizontal toolbar: top / bottom variants
+   */
+  placement?: VerticalPlacement | HorizontalPlacement
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -166,13 +200,53 @@ const isShowButtonText = computed(() => props.size === 'large')
 
 const buttonTooltip = (item: MlButtonData) => item.description ?? item.text
 
+const activePopoverIndex = ref<number | null>(null)
+
+const openPopover = (index: number) => {
+  activePopoverIndex.value = index
+}
+
+const closePopover = () => {
+  activePopoverIndex.value = null
+}
+
 const handleCommand = (command?: string) => {
   if (command) emit('click', command)
 }
 
-const popoverPlacement = computed(() =>
-  props.direction === 'vertical' ? 'right-start' : 'bottom-start'
-)
+const handleSubCommand = (command?: string) => {
+  if (command) emit('click', command)
+  closePopover() // 👈 hide sub toolbar after click
+}
+
+const popoverPlacement = computed(() => {
+  const verticalDefaults: VerticalPlacement = 'right-start'
+  const horizontalDefaults: HorizontalPlacement = 'bottom-start'
+
+  if (!props.placement) {
+    return props.direction === 'vertical'
+      ? verticalDefaults
+      : horizontalDefaults
+  }
+
+  // Direction-aware validation
+  if (
+    props.direction === 'vertical' &&
+    (props.placement.startsWith('left') || props.placement.startsWith('right'))
+  ) {
+    return props.placement
+  }
+
+  if (
+    props.direction === 'horizontal' &&
+    (props.placement.startsWith('top') || props.placement.startsWith('bottom'))
+  ) {
+    return props.placement
+  }
+
+  // Fallback if placement doesn't match direction
+  return props.direction === 'vertical' ? verticalDefaults : horizontalDefaults
+})
 
 const getSubToolbarMinWidth = (item: MlButtonData) => {
   return props.direction === 'horizontal' && item.children
