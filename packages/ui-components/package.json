@@ -1,6 +1,6 @@
 {
   "name": "@mlightcad/ui-components",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "One common UI component library based on Element Plus for web-based CAD",
   "license": "MIT",
   "author": "MLight Lee <mlight.lee@outlook.com>",
@@ -20,7 +20,7 @@
   ],
   "main": "dist/ui-components.umd.js",
   "module": "dist/ui-components.es.js",
-  "type": "module", 
+  "type": "module",
   "types": "./lib/index.d.ts",
   "files": [
     "dist",
