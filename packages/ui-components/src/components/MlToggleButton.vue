@@ -5,7 +5,8 @@
 </template>
 
 <script lang="ts" setup>
-import { Component, computed } from 'vue'
+import type { Component } from 'vue'
+import { computed } from 'vue'
 
 /**
  * Data to descibe toggle button
