@@ -41,10 +41,10 @@
             >
               <div>
                 <el-icon :size="buttonIconSize">
-                  <component :is="child.icon" />
+                  <component :is="resolvedIcon(child)" />
                 </el-icon>
                 <div v-if="isShowButtonText" class="ml-toolbar-button-text">
-                  {{ child.text }}
+                  {{ resolvedText(child) }}
                 </div>
               </div>
             </el-button>
@@ -67,10 +67,10 @@
             >
               <div>
                 <el-icon :size="buttonIconSize">
-                  <component :is="item.icon" />
+                  <component :is="resolvedIcon(item)" />
                 </el-icon>
                 <div v-if="isShowButtonText" class="ml-toolbar-button-text">
-                  {{ item.text }}
+                  {{ resolvedText(item) }}
                 </div>
               </div>
             </el-tooltip>
@@ -78,7 +78,7 @@
         </template>
       </el-popover>
 
-      <!-- ================= Normal button ================= -->
+      <!-- ================= Normal / Toggle button ================= -->
       <el-tooltip
         v-else
         :content="buttonTooltip(item)"
@@ -89,14 +89,14 @@
         <el-button
           class="ml-toolbar-button"
           :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
-          @click="handleCommand(item.command)"
+          @click="handleItemClick(item)"
         >
           <div>
             <el-icon :size="buttonIconSize">
-              <component :is="item.icon" />
+              <component :is="resolvedIcon(item)" />
             </el-icon>
             <div v-if="isShowButtonText" class="ml-toolbar-button-text">
-              {{ item.text }}
+              {{ resolvedText(item) }}
             </div>
           </div>
         </el-button>
@@ -106,8 +106,8 @@
 </template>
 
 <script setup lang="ts">
-import { Component, computed, ref } from 'vue'
-
+import type { Component } from 'vue'
+import { computed, ref, watch } from 'vue'
 type VerticalPlacement =
   | 'left'
   | 'left-start'
@@ -129,25 +129,54 @@ type HorizontalPlacement =
  */
 export interface MlButtonData {
   /**
-   * Icon represented by one vue component
-   */
-  icon: Component
-  /**
-   * Text shown below icon
-   */
-  text: string
-  /**
    * Command string which will be passed to click event as event arguments
    */
   command: string
   /**
-   * Tooltips content when hover
-   */
-  description?: string
-  /**
    * Sub toolbar data. If this property is set, the button will have a sub toolbar.
    */
   children?: MlButtonData[]
+  /**
+   * Toggle button configuration.
+   * If this property is set, the button becomes a toggle button.
+   */
+  toggle?: {
+    /**
+     * Initial toggle value
+     */
+    value?: boolean
+    /**
+     * Appearance when toggle is ON
+     */
+    on: {
+      icon: Component
+      text: string
+      description: string
+    }
+    /**
+     * Appearance when toggle is OFF
+     */
+    off: {
+      icon: Component
+      text: string
+      description: string
+    }
+  }
+  /**
+   * Icon represented by one vue component
+   * ⚠️ Ignored when toggle is defined
+   */
+  icon?: Component
+  /**
+   * Text shown below icon
+   * ⚠️ Ignored when toggle is defined
+   */
+  text?: string
+  /**
+   * Tooltips content when hover
+   * ⚠️ Ignored when toggle is defined
+   */
+  description?: string
 }
 
 /**
@@ -186,6 +215,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'click', command?: string): void
+  (e: 'toggle', command: string, value: boolean): void
 }>()
 
 const buttonIconSize = computed(() => (props.size === 'small' ? 20 : 30))
@@ -198,8 +228,6 @@ const buttonSize = computed(() => {
 
 const isShowButtonText = computed(() => props.size === 'large')
 
-const buttonTooltip = (item: MlButtonData) => item.description ?? item.text
-
 const activePopoverIndex = ref<number | null>(null)
 
 const openPopover = (index: number) => {
@@ -210,13 +238,70 @@ const closePopover = () => {
   activePopoverIndex.value = null
 }
 
-const handleCommand = (command?: string) => {
-  if (command) emit('click', command)
+/**
+ * Internal toggle state map
+ */
+const toggleStateMap = ref<Record<string, boolean>>({})
+
+watch(
+  () => props.items,
+  items => {
+    items.forEach(item => {
+      if (item.toggle && toggleStateMap.value[item.command] === undefined) {
+        toggleStateMap.value[item.command] = item.toggle.value ?? false
+      }
+    })
+  },
+  { immediate: true }
+)
+
+const handleItemClick = (item: MlButtonData) => {
+  if (item.toggle) {
+    const next = !toggleStateMap.value[item.command]
+    toggleStateMap.value[item.command] = next
+    emit('toggle', item.command, next)
+  } else {
+    emit('click', item.command)
+  }
 }
 
 const handleSubCommand = (command?: string) => {
   if (command) emit('click', command)
   closePopover() // 👈 hide sub toolbar after click
+}
+
+/**
+ * Resolve current toggle state
+ */
+const isToggleOn = (item: MlButtonData) =>
+  !!item.toggle && toggleStateMap.value[item.command]
+
+/**
+ * Resolve icon (toggle-aware)
+ */
+const resolvedIcon = (item: MlButtonData) => {
+  if (!item.toggle) return item.icon
+  return isToggleOn(item) ? item.toggle.on.icon : item.toggle.off.icon
+}
+
+/**
+ * Resolve text (toggle-aware)
+ */
+const resolvedText = (item: MlButtonData) => {
+  if (!item.toggle) return item.text
+  return isToggleOn(item) ? item.toggle.on.text : item.toggle.off.text
+}
+
+/**
+ * Resolve tooltip (toggle-aware)
+ */
+const buttonTooltip = (item: MlButtonData) => {
+  if (!item.toggle) {
+    return item.description ?? item.text
+  }
+  return isToggleOn(item)
+    ? (item.toggle.on.description ?? item.toggle.on.text)
+    : (item.toggle.off.description ?? item.toggle.off.text)
 }
 
 const popoverPlacement = computed(() => {

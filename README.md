@@ -223,19 +223,21 @@ const handleTabClose = (tabName: string) => {
 
 ### Toolbar
 
-Toolbar component has the followiing features.
+Toolbar component has the following features.
 
-- Define button list by one array of `MlButtonData`
-- Arrange button vertically or horizontally
-- Support three kind of button size
+-   Define button list by one array of `MlButtonData`
+-   Arrange button vertically or horizontally
+-   Support three kinds of button size
+-   **Support toggle buttons with two states (on / off)**
+-   **Support sub-toolbars (popover buttons)**
 
-<img src="./doc/toolbar.jpg" width="423" height="223" alt="ViewCube Example">
+<img src="./doc/toolbar.jpg" width="423" height="223" alt="Toolbar Example">
 
 Features above can be customized by the following properties.
 
-```javascript
+```
 /**
- * Properties of MLToolBar components
+ * Properties of MLToolBar component
  */
 interface Props {
   /**
@@ -248,45 +250,99 @@ interface Props {
    * - medium: 50px
    * - large: 70px
    */
-  size?: 'small' | 'medium'| 'large'
+  size?: 'small' | 'medium' | 'large'
   /**
    * Layout type.
    * - vertical: arrange button vertically
    * - horizontal: arrange button horizontally
    */
   direction?: 'vertical' | 'horizontal'
+  /**
+   * Placement of sub toolbar (popover)
+   * - vertical toolbar: left / right variants
+   * - horizontal toolbar: top / bottom variants
+   */
+  placement?: VerticalPlacement | HorizontalPlacement
 }
 ```
 
-Buttons in toolbar are described by the following data. Property `icon` can be icon provided by Element Plus or icon imported through `vite-svg-loader`.
+#### Button Definition
 
-```javascript
+Buttons in toolbar are described by the following data structure.  
+Property `icon` can be an icon provided by Element Plus or an icon imported through `vite-svg-loader`.
+
+```
 /**
  * Data to descibe button appearance
  */
 export interface MlButtonData {
   /**
-   * Icon represented by one vue component
-   */
-  icon: Component 
-  /**
-   * Text shown below icon
-   */
-  text: string
-  /**
    * Command string which will be passed to click event as event arguments
    */
   command: string
   /**
+   * Sub toolbar data. If this property is set, the button will have a sub toolbar.
+   */
+  children?: MlButtonData[]
+  /**
+   * Toggle button configuration.
+   * If this property is set, the button becomes a toggle button.
+   */
+  toggle?: {
+    /**
+     * Initial toggle value
+     */
+    value?: boolean
+    /**
+     * Appearance when toggle is ON
+     */
+    on: {
+      icon: Component
+      text: string
+      description: string
+    }
+    /**
+     * Appearance when toggle is OFF
+     */
+    off: {
+      icon: Component
+      text: string
+      description: string
+    }
+  }
+  /**
+   * Icon represented by one vue component
+   * ⚠️ Ignored when toggle is defined
+   */
+  icon?: Component
+  /**
+   * Text shown below icon
+   * ⚠️ Ignored when toggle is defined
+   */
+  text?: string
+  /**
    * Tooltips content when hover
+   * ⚠️ Ignored when toggle is defined
    */
   description?: string
 }
 ```
 
-Usage of this component is as follows. 
+#### Events
 
-```javascript
+Toolbar emits the following events:
+
+```
+@click(command: string)
+@toggle(command: string, value: boolean)
+```
+
+- `click`: emitted when a normal button or sub-button is clicked
+- `toggle`: emitted when a toggle button changes state
+
+#### Basic Usage
+
+```
 <script setup lang="ts">
 import '@mlightcad/ui-components/dist/style.css'
 import { MlButtonData, MlToolbar } from '@mlightcad/ui-components'
@@ -320,10 +376,56 @@ const handleCommand = (command: string) => {
 </script>
 
 <template>
-  <div>
-    <ml-toolbar :items="data" layout="vertical" @click="handleCommand"/>
-  </div>
+  <ml-toolbar
+    :items="data"
+    direction="vertical"
+    @click="handleCommand"
+  />
 </template>
-
-<style></style>
 ```
+
+#### Toggle Button Example
+
+Toolbar supports **toggle buttons** that have two states and can display different icons and texts for each state.
+
+```
+import { View, Hide } from '@element-plus/icons-vue'
+
+const data = reactive<MlButtonData[]>([
+  {
+    command: 'view.visibility',
+    toggle: {
+      value: true,
+      on: {
+        icon: View,
+        text: 'Show'
+        description: 'Shows entity'
+      },
+      off: {
+        icon: Hide,
+        text: 'Hide'
+        description: 'Shows entity'
+      }
+    }
+  }
+])
+```
+
+```
+<ml-toolbar
+  :items="data"
+  @toggle="(command, value) => {
+    console.log(command, value)
+  }"
+/>
+```
+
+- Initial state is controlled by `toggle.value`
+- Clicking the button switches between **on / off**
+- Icon and text are updated automatically
+- Current state is emitted via `@toggle`
+
+#### Notes
+
+- Toggle buttons and sub-toolbars can coexist with normal buttons
+- Toggle state is internally managed by the toolbar (uncontrolled by default)

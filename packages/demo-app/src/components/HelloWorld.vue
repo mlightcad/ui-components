@@ -4,8 +4,10 @@ import {
   Delete,
   DocumentChecked,
   Edit,
+  Hide,
   Scissor,
   Search,
+  View,
   ZoomIn,
   ZoomOut
 } from '@element-plus/icons-vue'
@@ -69,6 +71,28 @@ const toolBarData = reactive<MlButtonData[]>([
 
   /**
    * =========================
+   * Visibility (toggle button)
+   * =========================
+   */
+  {
+    command: 'view.visibility',
+    toggle: {
+      value: true, // initial state: visible
+      on: {
+        icon: markRaw(View),
+        text: 'Show',
+        description: 'Show entity'
+      },
+      off: {
+        icon: markRaw(Hide),
+        text: 'Hide',
+        description: 'Hide entity'
+      }
+    }
+  },
+
+  /**
+   * =========================
    * Search / Zoom (has sub toolbar)
    * =========================
    */
@@ -123,8 +147,14 @@ const toggleFullScreenButtonData: MlToggleButtonData = {
 
 const currentModel = ref('model')
 
-const handleCommand = (command: string) => {
-  console.log(command)
+const handleCommand = (cmd: string) => {
+  console.log(cmd)
+}
+
+const handleToggle = (cmd: string, value: boolean) => {
+  if (cmd === 'view.visibility') {
+    console.log('visibility: ', value)
+  }
 }
 </script>
 
@@ -134,6 +164,7 @@ const handleCommand = (command: string) => {
     :items="toolBarData"
     direction="horizontal"
     @click="handleCommand"
+    @toggle="handleToggle"
   />
   <ml-tool-bar
     class="vertical-toolbar-container"
@@ -141,6 +172,7 @@ const handleCommand = (command: string) => {
     direction="vertical"
     size="small"
     @click="handleCommand"
+    @toggle="handleToggle"
   />
   <ml-status-bar>
     <!-- Left Slot Content -->
