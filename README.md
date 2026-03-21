@@ -230,6 +230,7 @@ Toolbar component has the following features.
 -   Support three kinds of button size
 -   **Support toggle buttons with two states (on / off)**
 -   **Support sub-toolbars (popover buttons)**
+-   **Optionally support collapsing / expanding the toolbar**
 
 <img src="./doc/toolbar.jpg" width="423" height="223" alt="Toolbar Example">
 
@@ -263,6 +264,11 @@ interface Props {
    * - horizontal toolbar: top / bottom variants
    */
   placement?: VerticalPlacement | HorizontalPlacement
+  /**
+   * Show a collapse button to toggle the toolbar open and closed.
+   * The collapse button uses one-third of the normal button width or height.
+   */
+  collapsible?: boolean
 }
 ```
 
@@ -379,6 +385,7 @@ const handleCommand = (command: string) => {
   <ml-toolbar
     :items="data"
     direction="vertical"
+    collapsible
     @click="handleCommand"
   />
 </template>

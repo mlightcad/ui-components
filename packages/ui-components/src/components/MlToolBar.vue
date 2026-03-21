@@ -1,6 +1,20 @@
 <template>
   <el-button-group class="ml-toolbar-group" :direction="direction">
-    <template v-for="(item, index) in items" :key="index">
+    <el-button
+      v-if="collapsible"
+      class="ml-toolbar-button ml-toolbar-collapse-button"
+      :style="collapseButtonStyle"
+      @click="toggleCollapsed"
+    >
+      <el-icon :size="collapseButtonIconSize" class="ml-toolbar-collapse-icon">
+        <component
+          :is="collapseButtonIcon"
+          :style="{ transform: `rotate(${collapseIconRotation}deg)` }"
+        />
+      </el-icon>
+    </el-button>
+
+    <template v-for="(item, index) in visibleItems" :key="index">
       <!-- ================= Button with sub toolbar ================= -->
       <el-popover
         v-if="item.children?.length"
@@ -108,6 +122,9 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { computed, ref, watch } from 'vue'
+
+import ArrowLeft from '../svgs/arrow-left.svg'
+import ArrowRight from '../svgs/arrow-right.svg'
 type VerticalPlacement =
   | 'left'
   | 'left-start'
@@ -206,11 +223,16 @@ interface Props {
    * - horizontal toolbar: top / bottom variants
    */
   placement?: VerticalPlacement | HorizontalPlacement
+  /**
+   * Show a collapse button and allow the toolbar to be toggled open/closed.
+   */
+  collapsible?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'large',
-  direction: 'horizontal'
+  direction: 'horizontal',
+  collapsible: false
 })
 
 const emit = defineEmits<{
@@ -226,9 +248,31 @@ const buttonSize = computed(() => {
   return 70
 })
 
+const collapseButtonShortSide = computed(() => buttonSize.value / 3)
+
+const collapseButtonIconSize = computed(() =>
+  Math.max(8, Math.floor(collapseButtonShortSide.value) - 2)
+)
+
 const isShowButtonText = computed(() => props.size === 'large')
 
 const activePopoverIndex = ref<number | null>(null)
+const isCollapsed = ref(false)
+
+const visibleItems = computed(() =>
+  props.collapsible && isCollapsed.value ? [] : props.items
+)
+
+const collapseButtonStyle = computed(() => ({
+  width:
+    props.direction === 'horizontal'
+      ? `${collapseButtonShortSide.value}px`
+      : `${buttonSize.value}px`,
+  height:
+    props.direction === 'vertical'
+      ? `${collapseButtonShortSide.value}px`
+      : `${buttonSize.value}px`
+}))
 
 const openPopover = (index: number) => {
   activePopoverIndex.value = index
@@ -236,6 +280,11 @@ const openPopover = (index: number) => {
 
 const closePopover = () => {
   activePopoverIndex.value = null
+}
+
+const toggleCollapsed = () => {
+  isCollapsed.value = !isCollapsed.value
+  closePopover()
 }
 
 /**
@@ -253,6 +302,13 @@ watch(
     })
   },
   { immediate: true }
+)
+
+watch(
+  () => props.collapsible,
+  collapsible => {
+    if (!collapsible) isCollapsed.value = false
+  }
 )
 
 const handleItemClick = (item: MlButtonData) => {
@@ -303,6 +359,15 @@ const buttonTooltip = (item: MlButtonData) => {
     ? (item.toggle.on.description ?? item.toggle.on.text)
     : (item.toggle.off.description ?? item.toggle.off.text)
 }
+
+const collapseButtonIcon = computed(() =>
+  isCollapsed.value ? ArrowRight : ArrowLeft
+)
+
+const collapseIconRotation = computed(() => {
+  if (props.direction === 'horizontal') return 0
+  return 90
+})
 
 const popoverPlacement = computed(() => {
   const verticalDefaults: VerticalPlacement = 'right-start'
@@ -359,6 +424,17 @@ const getSubToolbarMaxWidth = (item: MlButtonData) => {
   align-items: center;
   justify-content: center;
   padding: 5px;
+}
+
+.ml-toolbar-collapse-button {
+  min-width: 0;
+  padding: 0;
+}
+
+.ml-toolbar-collapse-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ml-toolbar-button-text {
