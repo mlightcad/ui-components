@@ -12,6 +12,10 @@ export interface DragOptions {
    * with the offset area.
    */
   offset: Ref<Offset>
+  /**
+   * Return false to suppress drag start (e.g. pointer is on a resize edge).
+   */
+  canStartDrag?: (event: MouseEvent) => boolean
 }
 
 /**
@@ -74,6 +78,10 @@ export function useDrag(
 
   const onMouseDown = (event: MouseEvent) => {
     if (targetRef.value == null) return
+
+    if (options?.value.canStartDrag && !options.value.canStartDrag(event)) {
+      return
+    }
 
     // If draElementRef is specified, check whether mouse clicks on `dragElementRef`
     if (dragElementRef && dragElementRef.value) {

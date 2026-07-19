@@ -1,19 +1,5 @@
 <template>
   <el-button-group class="ml-toolbar-group" :direction="direction">
-    <el-button
-      v-if="collapsible"
-      class="ml-toolbar-button ml-toolbar-collapse-button"
-      :style="collapseButtonStyle"
-      @click="toggleCollapsed"
-    >
-      <el-icon :size="collapseButtonIconSize" class="ml-toolbar-collapse-icon">
-        <component
-          :is="collapseButtonIcon"
-          :style="{ transform: `rotate(${collapseIconRotation}deg)` }"
-        />
-      </el-icon>
-    </el-button>
-
     <template v-for="(item, index) in visibleItems" :key="index">
       <!-- ================= Button with sub toolbar ================= -->
       <el-popover
@@ -116,6 +102,18 @@
         </el-button>
       </el-tooltip>
     </template>
+
+    <!-- Collapse at end: bottom for vertical (left/right), right for horizontal (top/bottom) -->
+    <el-button
+      v-if="collapsible"
+      class="ml-toolbar-button ml-toolbar-collapse-button"
+      :style="collapseButtonStyle"
+      @click="toggleCollapsed"
+    >
+      <el-icon :size="collapseButtonIconSize" class="ml-toolbar-collapse-icon">
+        <component :is="collapseButtonIcon" />
+      </el-icon>
+    </el-button>
   </el-button-group>
 </template>
 
@@ -123,8 +121,10 @@
 import type { Component } from 'vue'
 import { computed, ref, watch } from 'vue'
 
+import ArrowDown from '../svgs/arrow-down.svg'
 import ArrowLeft from '../svgs/arrow-left.svg'
 import ArrowRight from '../svgs/arrow-right.svg'
+import ArrowUp from '../svgs/arrow-up.svg'
 type VerticalPlacement =
   | 'left'
   | 'left-start'
@@ -360,13 +360,17 @@ const buttonTooltip = (item: MlButtonData) => {
     : (item.toggle.off.description ?? item.toggle.off.text)
 }
 
-const collapseButtonIcon = computed(() =>
-  isCollapsed.value ? ArrowRight : ArrowLeft
-)
-
-const collapseIconRotation = computed(() => {
-  if (props.direction === 'horizontal') return 0
-  return 90
+/**
+ * Arrow points toward the content when expanded (collapse inward),
+ * and toward the open direction when collapsed.
+ * Horizontal (top/bottom): button on the right → left / right.
+ * Vertical (left/right): button on the bottom → up / down.
+ */
+const collapseButtonIcon = computed(() => {
+  if (props.direction === 'horizontal') {
+    return isCollapsed.value ? ArrowRight : ArrowLeft
+  }
+  return isCollapsed.value ? ArrowDown : ArrowUp
 })
 
 const popoverPlacement = computed(() => {
