@@ -81,6 +81,10 @@ const handleTabClose = (tabName: string) => {
     }
   }
 }
+
+const handleDockChange = (side: string) => {
+  console.log('Dock side changed to:', side)
+}
 </script>
 
 <template>
@@ -111,6 +115,7 @@ const handleTabClose = (tabName: string) => {
     :bottom-offset="30"
     @tab-change="handleTabChange"
     @tab-close="handleTabClose"
+    @dock-change="handleDockChange"
   >
     <template #tab-blocks>
       <div class="tool-palette-tab-content">

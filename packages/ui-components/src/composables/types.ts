@@ -20,7 +20,14 @@ export interface Position {
   y: number
 }
 
-export type Orientation = 'left' | 'right'
+export type Orientation = 'left' | 'right' | 'top' | 'bottom'
+
+/**
+ * Dock position of the tool palette.
+ * - `left` / `right` / `top` / `bottom`: snapped to that window edge
+ * - `float`: undocked floating panel
+ */
+export type DockSide = Orientation | 'float'
 
 // Width of the title bar of the tool palette
 export const WIDTH_OF_TITLE_BAR = 20

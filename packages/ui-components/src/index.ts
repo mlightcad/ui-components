@@ -1,6 +1,7 @@
 import MlCollapse from './components/MlCollapse.vue'
 import MlDropdown from './components/MlDropdown.vue'
 import MlLanguage from './components/MlLanguage.vue'
+import MlOverflowTabs from './components/MlOverflowTabs.vue'
 import MlStatusBar from './components/MlStatusBar.vue'
 import MlToggleButton from './components/MlToggleButton.vue'
 import MlToolBar from './components/MlToolBar.vue'
@@ -9,15 +10,20 @@ export {
   MlCollapse,
   MlDropdown,
   MlLanguage,
+  MlOverflowTabs,
   MlStatusBar,
   MlToggleButton,
   MlToolBar,
   MlToolPalette
 }
 export type { MlDropdownMenuItem } from './components/MlDropdown.vue'
+export type { MlOverflowTab } from './components/MlOverflowTab'
 export type { MlToggleButtonData } from './components/MlToggleButton.vue'
 export type { MlButtonData } from './components/MlToolBar.vue'
-export type { MlToolPaletteTab } from './components/MlToolPalette.vue'
+export type {
+  MlToolPaletteDockSide,
+  MlToolPaletteTab
+} from './components/MlToolPalette.vue'
 
 // Optionally, export them as a plugin for Vue
 export default {
@@ -26,6 +32,7 @@ export default {
     app.component('MlCollapse', MlDropdown)
     app.component('MlDropdown', MlDropdown)
     app.component('MlLanguage', MlLanguage)
+    app.component('MlOverflowTabs', MlOverflowTabs)
     app.component('MlStatusBar', MlStatusBar)
     app.component('MlToggleButton', MlToggleButton)
     app.component('MlToolBar', MlToolBar)
