@@ -230,6 +230,7 @@ Toolbar component has the following features.
 -   Support three kinds of button size
 -   **Support toggle buttons with two states (on / off)**
 -   **Support sub-toolbars (popover buttons)**
+-   **Support separators between buttons**
 -   **Optionally support collapsing / expanding the toolbar**
 
 <img src="./doc/toolbar.jpg" width="423" height="223" alt="Toolbar Example">
@@ -283,11 +284,19 @@ Property `icon` can be an icon provided by Element Plus or an icon imported thro
  */
 export interface MlButtonData {
   /**
-   * Command string which will be passed to click event as event arguments
+   * Item type.
+   * - button: normal / toggle / popover button (default)
+   * - separator: visual divider between buttons
    */
-  command: string
+  type?: 'button' | 'separator'
+  /**
+   * Command string which will be passed to click event as event arguments.
+   * Not required when `type` is `'separator'` or when the item only has `children`.
+   */
+  command?: string
   /**
    * Sub toolbar data. If this property is set, the button will have a sub toolbar.
+   * Children may also include separators.
    */
   children?: MlButtonData[]
   /**
@@ -391,6 +400,26 @@ const handleCommand = (command: string) => {
 </template>
 ```
 
+#### Separator Example
+
+Insert `{ type: 'separator' }` into the `items` (or `children`) array to draw a divider between buttons. Separators work in both horizontal and vertical toolbars.
+
+```
+const data = reactive<MlButtonData[]>([
+  {
+    icon: Edit,
+    text: 'Edit',
+    command: 'edit'
+  },
+  { type: 'separator' },
+  {
+    icon: Delete,
+    text: 'Delete',
+    command: 'delete'
+  }
+])
+```
+
 #### Toggle Button Example
 
 Toolbar supports **toggle buttons** that have two states and can display different icons and texts for each state.
@@ -434,5 +463,6 @@ const data = reactive<MlButtonData[]>([
 
 #### Notes
 
-- Toggle buttons and sub-toolbars can coexist with normal buttons
+- Toggle buttons, sub-toolbars, and separators can coexist with normal buttons
 - Toggle state is internally managed by the toolbar (uncontrolled by default)
+- Insert `{ type: 'separator' }` in `items` or `children` to add a divider between buttons

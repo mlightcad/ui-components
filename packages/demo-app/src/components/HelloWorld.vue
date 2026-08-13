@@ -69,6 +69,8 @@ const toolBarData = reactive<MlButtonData[]>([
     description: 'Delete selected entities'
   },
 
+  { type: 'separator' },
+
   /**
    * =========================
    * Visibility (toggle button)
@@ -107,6 +109,7 @@ const toolBarData = reactive<MlButtonData[]>([
         command: 'search.find',
         description: 'Find entities by property'
       },
+      { type: 'separator' },
       {
         icon: markRaw(ZoomIn),
         text: 'Zoom In',
