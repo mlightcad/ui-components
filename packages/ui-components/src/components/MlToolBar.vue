@@ -1,9 +1,16 @@
 <template>
-  <el-button-group class="ml-toolbar-group" :direction="direction">
+  <el-button-group
+    class="ml-toolbar-group"
+    :class="toolbarDirectionClass"
+    :direction="direction"
+  >
     <template v-for="(item, index) in visibleItems" :key="index">
+      <!-- ================= Separator ================= -->
+      <span v-if="isSeparator(item)" class="ml-toolbar-separator" />
+
       <!-- ================= Button with sub toolbar ================= -->
       <el-popover
-        v-if="item.children?.length"
+        v-else-if="item.children?.length"
         :visible="activePopoverIndex === index"
         trigger="manual"
         :placement="popoverPlacement"
@@ -22,33 +29,36 @@
         <!-- Sub toolbar -->
         <el-button-group
           class="ml-sub-toolbar-group"
+          :class="toolbarDirectionClass"
           :direction="direction"
           @mouseenter="openPopover(index)"
           @mouseleave="closePopover"
         >
-          <el-tooltip
-            v-for="(child, cIndex) in item.children"
-            :key="cIndex"
-            :content="buttonTooltip(child)"
-            :auto-close="3000"
-            :show-after="1000"
-            :hide-after="0"
-          >
-            <el-button
-              class="ml-toolbar-button"
-              :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
-              @click="handleSubCommand(child.command)"
+          <template v-for="(child, cIndex) in item.children" :key="cIndex">
+            <span v-if="isSeparator(child)" class="ml-toolbar-separator" />
+            <el-tooltip
+              v-else
+              :content="buttonTooltip(child)"
+              :auto-close="3000"
+              :show-after="1000"
+              :hide-after="0"
             >
-              <div>
-                <el-icon :size="buttonIconSize">
-                  <component :is="resolvedIcon(child)" />
-                </el-icon>
-                <div v-if="isShowButtonText" class="ml-toolbar-button-text">
-                  {{ resolvedText(child) }}
+              <el-button
+                class="ml-toolbar-button"
+                :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
+                @click="handleSubCommand(child)"
+              >
+                <div>
+                  <el-icon :size="buttonIconSize">
+                    <component :is="resolvedIcon(child)" />
+                  </el-icon>
+                  <div v-if="isShowButtonText" class="ml-toolbar-button-text">
+                    {{ resolvedText(child) }}
+                  </div>
                 </div>
-              </div>
-            </el-button>
-          </el-tooltip>
+              </el-button>
+            </el-tooltip>
+          </template>
         </el-button-group>
 
         <!-- Reference -->
@@ -146,11 +156,19 @@ type HorizontalPlacement =
  */
 export interface MlButtonData {
   /**
-   * Command string which will be passed to click event as event arguments
+   * Item type.
+   * - button: normal / toggle / popover button (default)
+   * - separator: visual divider between buttons
    */
-  command: string
+  type?: 'button' | 'separator'
+  /**
+   * Command string which will be passed to click event as event arguments.
+   * Not required when `type` is `'separator'` or when the item only has `children`.
+   */
+  command?: string
   /**
    * Sub toolbar data. If this property is set, the button will have a sub toolbar.
+   * Children may also include separators.
    */
   children?: MlButtonData[]
   /**
@@ -256,6 +274,16 @@ const collapseButtonIconSize = computed(() =>
 
 const isShowButtonText = computed(() => props.size === 'large')
 
+const toolbarDirectionClass = computed(() =>
+  props.direction === 'vertical'
+    ? 'ml-toolbar-group--vertical'
+    : 'ml-toolbar-group--horizontal'
+)
+
+const separatorSize = computed(() => 7)
+
+const isSeparator = (item: MlButtonData) => item.type === 'separator'
+
 const activePopoverIndex = ref<number | null>(null)
 const isCollapsed = ref(false)
 
@@ -292,14 +320,25 @@ const toggleCollapsed = () => {
  */
 const toggleStateMap = ref<Record<string, boolean>>({})
 
+const initToggleState = (items: MlButtonData[]) => {
+  items.forEach(item => {
+    if (item.command && item.toggle) {
+      if (typeof item.toggle.value === 'boolean') {
+        toggleStateMap.value[item.command] = item.toggle.value
+      } else if (toggleStateMap.value[item.command] === undefined) {
+        toggleStateMap.value[item.command] = false
+      }
+    }
+    if (item.children?.length) {
+      initToggleState(item.children)
+    }
+  })
+}
+
 watch(
   () => props.items,
   items => {
-    items.forEach(item => {
-      if (item.toggle && toggleStateMap.value[item.command] === undefined) {
-        toggleStateMap.value[item.command] = item.toggle.value ?? false
-      }
-    })
+    initToggleState(items)
   },
   { immediate: true }
 )
@@ -312,8 +351,13 @@ watch(
 )
 
 const handleItemClick = (item: MlButtonData) => {
+  if (isSeparator(item) || !item.command) return
   if (item.toggle) {
-    const next = !toggleStateMap.value[item.command]
+    const current =
+      typeof item.toggle.value === 'boolean'
+        ? item.toggle.value
+        : !!toggleStateMap.value[item.command]
+    const next = !current
     toggleStateMap.value[item.command] = next
     emit('toggle', item.command, next)
   } else {
@@ -321,16 +365,21 @@ const handleItemClick = (item: MlButtonData) => {
   }
 }
 
-const handleSubCommand = (command?: string) => {
-  if (command) emit('click', command)
-  closePopover() // 👈 hide sub toolbar after click
+const handleSubCommand = (item: MlButtonData) => {
+  handleItemClick(item)
+  closePopover()
 }
 
 /**
- * Resolve current toggle state
+ * Resolve current toggle state. `toggle.value` is treated as a controlled
+ * state when it is a boolean, so parent updates (for example after a command)
+ * are reflected on both root and submenu buttons.
  */
-const isToggleOn = (item: MlButtonData) =>
-  !!item.toggle && toggleStateMap.value[item.command]
+const isToggleOn = (item: MlButtonData) => {
+  if (!item.toggle || !item.command) return false
+  if (typeof item.toggle.value === 'boolean') return item.toggle.value
+  return !!toggleStateMap.value[item.command]
+}
 
 /**
  * Resolve icon (toggle-aware)
@@ -403,9 +452,14 @@ const popoverPlacement = computed(() => {
 })
 
 const getSubToolbarMinWidth = (item: MlButtonData) => {
-  return props.direction === 'horizontal' && item.children
-    ? item.children.length * buttonSize.value
-    : buttonSize.value
+  if (props.direction !== 'horizontal' || !item.children) {
+    return buttonSize.value
+  }
+  return item.children.reduce(
+    (width, child) =>
+      width + (isSeparator(child) ? separatorSize.value : buttonSize.value),
+    0
+  )
 }
 
 const getSubToolbarMaxWidth = (item: MlButtonData) => {
@@ -415,11 +469,34 @@ const getSubToolbarMaxWidth = (item: MlButtonData) => {
 
 <style scoped>
 .ml-toolbar-group {
+  display: inline-flex;
   background-color: var(--el-fill-color);
+}
+
+.ml-toolbar-group--vertical {
+  flex-direction: column;
 }
 
 .ml-sub-toolbar-group {
   background-color: var(--el-bg-color);
+}
+
+.ml-toolbar-separator {
+  flex-shrink: 0;
+  align-self: stretch;
+  pointer-events: none;
+  background-color: var(--el-border-color);
+}
+
+.ml-toolbar-group--horizontal > .ml-toolbar-separator {
+  width: 1px;
+  margin: 6px 3px;
+}
+
+.ml-toolbar-group--vertical > .ml-toolbar-separator {
+  height: 1px;
+  width: auto;
+  margin: 3px 6px;
 }
 
 .ml-toolbar-button {
