@@ -166,6 +166,7 @@ const handleToggle = (cmd: string, value: boolean) => {
     class="horizontal-toolbar-container"
     :items="toolBarData"
     direction="horizontal"
+    placement="top"
     collapsible
     @click="handleCommand"
     @toggle="handleToggle"
@@ -174,6 +175,7 @@ const handleToggle = (cmd: string, value: boolean) => {
     class="vertical-toolbar-container"
     :items="toolBarData"
     direction="vertical"
+    placement="left"
     size="small"
     collapsible
     @click="handleCommand"

@@ -3,6 +3,7 @@
     class="ml-toolbar-group"
     :class="toolbarDirectionClass"
     :direction="direction"
+    :style="toolbarCssVars"
   >
     <template v-for="(item, index) in visibleItems" :key="index">
       <!-- ================= Separator ================= -->
@@ -64,7 +65,8 @@
         <!-- Reference -->
         <template #reference>
           <el-button
-            class="ml-toolbar-button"
+            class="ml-toolbar-button ml-toolbar-button--has-children"
+            :class="`ml-toolbar-button--flyout-${flyoutSide}`"
             :style="{ width: buttonSize + 'px', height: buttonSize + 'px' }"
             @mouseenter="openPopover(index)"
             @mouseleave="closePopover"
@@ -236,9 +238,9 @@ interface Props {
    */
   direction?: 'vertical' | 'horizontal'
   /**
-   * Placement of sub toolbar (popover)
-   * - vertical toolbar: left / right variants
-   * - horizontal toolbar: top / bottom variants
+   * Placement of the sub-toolbar popover, and of the parent-button flyout mark.
+   * Use the side toward the canvas (opposite the toolbar dock): right dock →
+   * `left`, left dock → `right`, top dock → `bottom`, bottom dock → `top`.
    */
   placement?: VerticalPlacement | HorizontalPlacement
   /**
@@ -265,6 +267,23 @@ const buttonSize = computed(() => {
   if (props.size === 'medium') return 50
   return 70
 })
+
+/**
+ * AutoCAD-style flyout mark edge length. Scales with {@link buttonSize} so the
+ * triangle stays in the icon padding and does not overlap the glyph.
+ */
+const flyoutMarkSize = computed(() => {
+  if (props.size === 'small') return 5
+  if (props.size === 'medium') return 9
+  return 12
+})
+
+const flyoutMarkInset = computed(() => (props.size === 'small' ? 1 : 2))
+
+const toolbarCssVars = computed(() => ({
+  '--ml-toolbar-flyout-mark-size': `${flyoutMarkSize.value}px`,
+  '--ml-toolbar-flyout-mark-inset': `${flyoutMarkInset.value}px`
+}))
 
 const collapseButtonShortSide = computed(() => buttonSize.value / 3)
 
@@ -451,6 +470,18 @@ const popoverPlacement = computed(() => {
   return props.direction === 'vertical' ? verticalDefaults : horizontalDefaults
 })
 
+/**
+ * Corner of the flyout mark, matching the side the sub-toolbar opens toward
+ * (from {@link popoverPlacement}).
+ */
+const flyoutSide = computed(() => {
+  const placement = popoverPlacement.value
+  if (placement.startsWith('left')) return 'left'
+  if (placement.startsWith('right')) return 'right'
+  if (placement.startsWith('top')) return 'top'
+  return 'bottom'
+})
+
 const getSubToolbarMinWidth = (item: MlButtonData) => {
   if (props.direction !== 'horizontal' || !item.children) {
     return buttonSize.value
@@ -500,11 +531,48 @@ const getSubToolbarMaxWidth = (item: MlButtonData) => {
 }
 
 .ml-toolbar-button {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 5px;
+  overflow: visible;
+}
+
+/* Flyout mark: right triangle in the corner toward the sub-toolbar. Size
+   comes from --ml-toolbar-flyout-mark-* so it tracks small / medium / large. */
+.ml-toolbar-button--has-children::after {
+  content: '';
+  position: absolute;
+  width: var(--ml-toolbar-flyout-mark-size, 5px);
+  height: var(--ml-toolbar-flyout-mark-size, 5px);
+  background: currentColor;
+  pointer-events: none;
+}
+
+.ml-toolbar-button--flyout-left::after {
+  left: var(--ml-toolbar-flyout-mark-inset, 1px);
+  bottom: var(--ml-toolbar-flyout-mark-inset, 1px);
+  clip-path: polygon(0 100%, 0 0, 100% 100%);
+}
+
+.ml-toolbar-button--flyout-right::after {
+  right: var(--ml-toolbar-flyout-mark-inset, 1px);
+  bottom: var(--ml-toolbar-flyout-mark-inset, 1px);
+  clip-path: polygon(100% 100%, 0 100%, 100% 0);
+}
+
+.ml-toolbar-button--flyout-bottom::after {
+  right: var(--ml-toolbar-flyout-mark-inset, 1px);
+  bottom: var(--ml-toolbar-flyout-mark-inset, 1px);
+  clip-path: polygon(100% 100%, 0 100%, 100% 0);
+}
+
+.ml-toolbar-button--flyout-top::after {
+  right: var(--ml-toolbar-flyout-mark-inset, 1px);
+  top: var(--ml-toolbar-flyout-mark-inset, 1px);
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
 }
 
 .ml-toolbar-collapse-button {

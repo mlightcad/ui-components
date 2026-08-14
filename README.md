@@ -229,7 +229,7 @@ Toolbar component has the following features.
 -   Arrange button vertically or horizontally
 -   Support three kinds of button size
 -   **Support toggle buttons with two states (on / off)**
--   **Support sub-toolbars (popover buttons)**
+-   **Support sub-toolbars (popover buttons)** with an AutoCAD-style corner flyout mark that scales with button size
 -   **Support separators between buttons**
 -   **Optionally support collapsing / expanding the toolbar**
 
@@ -463,6 +463,7 @@ const data = reactive<MlButtonData[]>([
 
 #### Notes
 
+- Parent buttons with a sub-toolbar show a small right triangle in the corner toward the sub-toolbar. Set `placement` to the side the submenu should open (the opposite of the toolbar dock: right dock → `left`, bottom dock → `top`). The mark scales with `size` (`small` 5px, `medium` 9px, `large` 12px).
 - Toggle buttons, sub-toolbars, and separators can coexist with normal buttons
 - Toggle state is internally managed by the toolbar (uncontrolled by default)
 - Insert `{ type: 'separator' }` in `items` or `children` to add a divider between buttons
