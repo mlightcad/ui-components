@@ -260,9 +260,9 @@ interface Props {
    */
   direction?: 'vertical' | 'horizontal'
   /**
-   * Placement of sub toolbar (popover)
-   * - vertical toolbar: left / right variants
-   * - horizontal toolbar: top / bottom variants
+   * Placement of the sub-toolbar popover, and of the parent-button flyout mark.
+   * Use the side toward the canvas (opposite the toolbar dock): right dock →
+   * `left`, left dock → `right`, top dock → `bottom`, bottom dock → `top`.
    */
   placement?: VerticalPlacement | HorizontalPlacement
   /**
