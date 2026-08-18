@@ -1,13 +1,13 @@
 # Common UI Component Libaray
 
-This is one common UI component library based on Element Plus. 
+This is one common UI component library based on Element Plus.
 
 ## Components
 
 The following components are included in this package.
 
 - Tool Palette: one dockable, resizable, and floating window, which is quite similar to AutoCAD Tool Palette.
-- Toolbar: one toolbar which can be easily customized by one array of button data. 
+- Toolbar: one toolbar which can be easily customized by one array of button data.
 
 [**🌐 Live Demo**](https://mlightcad.gitlab.io/ui-components/).
 
@@ -21,7 +21,7 @@ AutoCAD uses [tool palettes](https://help.autodesk.com/view/ACD/2025/ENU/?guid=G
 
 <img src="./doc/palette.jpg" alt="Tool Palette Example">
 
-You can customize tool palette by the following properties. 
+You can customize tool palette by the following properties.
 
 ```javascript
 /**
@@ -77,7 +77,7 @@ export interface MlToolPaletteTab {
 }
 ```
 
-Four `offsetXXX` properties are used to set the minimum distance from the side of the tool palette to the side of the window. It is quite useful if you want the tool palette is shown within certain area. For example, one web page has one title bar at the top of window, one status bar at the bottom of window, and one canvas area between the title bar and the status bar. The height of the title bar is 60px and the height of the status bar is 20px. Then you can set `topOffset` to 60 and `bottomOffset` to 20 to let the tool palette are shown and moved within canvas area only. 
+Four `offsetXXX` properties are used to set the minimum distance from the side of the tool palette to the side of the window. It is quite useful if you want the tool palette is shown within certain area. For example, one web page has one title bar at the top of window, one status bar at the bottom of window, and one canvas area between the title bar and the status bar. The height of the title bar is 60px and the height of the status bar is 20px. Then you can set `topOffset` to 60 and `bottomOffset` to 20 to let the tool palette are shown and moved within canvas area only.
 
 #### Basic Usage
 
@@ -212,10 +212,11 @@ const handleTabClose = (tabName: string) => {
 ```
 
 **Tab Features:**
+
 - **Closeable tabs**: Each tab has a close icon that can be clicked to close the tab
 - **Active tab title**: When a tab is active, its `title` property (if provided) is displayed in the title bar
 - **Tab switching**: Use `v-model:active-tab` to control which tab is active
-- **Tab events**: 
+- **Tab events**:
   - `@tab-change`: Emitted when the active tab changes
   - `@tab-close`: Emitted when a tab is closed
 - **Tab content**: Use named slots `#tab-{name}` to provide content for each tab
@@ -225,13 +226,15 @@ const handleTabClose = (tabName: string) => {
 
 Toolbar component has the following features.
 
--   Define button list by one array of `MlButtonData`
--   Arrange button vertically or horizontally
--   Support three kinds of button size
--   **Support toggle buttons with two states (on / off)**
--   **Support sub-toolbars (popover buttons)** with an AutoCAD-style corner flyout mark that scales with button size
--   **Support separators between buttons**
--   **Optionally support collapsing / expanding the toolbar**
+- Define button list by one array of `MlButtonData`
+- Arrange button vertically or horizontally
+- Support three kinds of button size
+- **Support toggle buttons with two states (on / off)**
+- **Support sub-toolbars** with an AutoCAD-style corner flyout mark that scales with button size
+- **Support three child presentations**: sticky toolbar, dismissible toolbar, and popover menu
+- **Support `followChild`**: parent button icon/text follow the selected child
+- **Support separators between buttons**
+- **Optionally support collapsing / expanding the toolbar**
 
 <img src="./doc/toolbar.jpg" width="423" height="223" alt="Toolbar Example">
 
@@ -295,10 +298,30 @@ export interface MlButtonData {
    */
   command?: string
   /**
-   * Sub toolbar data. If this property is set, the button will have a sub toolbar.
+   * Sub toolbar / menu items. If this property is set, the button will open
+   * children according to `childrenType`.
    * Children may also include separators.
    */
   children?: MlButtonData[]
+  /**
+   * Presentation of `children`.
+   * - sticky: parent acts as a switch; stays open until clicked again or
+   *   another parent that opens children is clicked. Outside clicks do not close it.
+   * - dismissible: toolbar that closes when the user clicks the canvas or
+   *   any other area outside the popover (default)
+   * - menu: children are shown as a popover menu (not a toolbar). Outside
+   *   clicks close it, same as dismissible.
+   */
+  childrenType?: 'sticky' | 'dismissible' | 'menu'
+  /**
+   * When true, children represent a selection. After a child is chosen, this
+   * button's icon, text, and tooltip follow that child.
+   */
+  followChild?: boolean
+  /**
+   * Initial selected child `command` when `followChild` is true.
+   */
+  selectedCommand?: string
   /**
    * Toggle button configuration.
    * If this property is set, the button becomes a toggle button.
@@ -461,9 +484,59 @@ const data = reactive<MlButtonData[]>([
 - Icon and text are updated automatically
 - Current state is emitted via `@toggle`
 
+#### Sub-toolbar Types
+
+Buttons with `children` open on **click**. Only one child popover is open at a time; clicking another parent that has children closes the previous one.
+
+**Sticky toolbar** — parent button is a switch. Clicking the canvas does not close it.
+
+```
+{
+  icon: EditPen,
+  text: 'Draw',
+  childrenType: 'sticky',
+  followChild: true,
+  selectedCommand: 'draw.line',
+  children: [
+    { icon: Minus, text: 'Line', command: 'draw.line' },
+    { icon: Crop, text: 'Rect', command: 'draw.rect' }
+  ]
+}
+```
+
+**Dismissible toolbar** — clicking the canvas or any other area closes it (default).
+
+```
+{
+  icon: Edit,
+  text: 'Edit',
+  childrenType: 'dismissible',
+  children: [
+    { icon: CopyDocument, text: 'Copy', command: 'edit.copy' },
+    { icon: Scissor, text: 'Cut', command: 'edit.cut' }
+  ]
+}
+```
+
+**Popover menu** — children are listed as a menu instead of a toolbar. Outside clicks close it.
+
+```
+{
+  icon: ZoomIn,
+  text: 'View',
+  childrenType: 'menu',
+  followChild: true,
+  children: [
+    { icon: ZoomIn, text: 'Zoom In', command: 'view.zoomIn' },
+    { icon: ZoomOut, text: 'Zoom Out', command: 'view.zoomOut' }
+  ]
+}
+```
+
 #### Notes
 
 - Parent buttons with a sub-toolbar show a small right triangle in the corner toward the sub-toolbar. Set `placement` to the side the submenu should open (the opposite of the toolbar dock: right dock → `left`, bottom dock → `top`). The mark scales with `size` (`small` 5px, `medium` 9px, `large` 12px).
 - Toggle buttons, sub-toolbars, and separators can coexist with normal buttons
 - Toggle state is internally managed by the toolbar (uncontrolled by default)
 - Insert `{ type: 'separator' }` in `items` or `children` to add a divider between buttons
+- Set `followChild: true` so the parent icon (and text/tooltip) tracks the last selected child. Use `selectedCommand` for the initial selection.

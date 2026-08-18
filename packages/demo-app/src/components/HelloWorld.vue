@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import {
+  Aim,
   CopyDocument,
+  Crop,
   Delete,
   DocumentChecked,
   Edit,
+  EditPen,
+  FullScreen,
   Hide,
+  Minus,
+  ScaleToOriginal,
   Scissor,
-  Search,
   View,
   ZoomIn,
   ZoomOut
@@ -28,13 +33,51 @@ const { isFullscreen, toggle } = useFullscreen()
 const toolBarData = reactive<MlButtonData[]>([
   /**
    * =========================
-   * Edit (has sub toolbar)
+   * Draw (sticky + followChild)
+   * Parent button toggles the sub-toolbar. Clicking the canvas does not
+   * close it. Choosing a child updates the parent icon.
+   * =========================
+   */
+  {
+    icon: markRaw(EditPen),
+    text: 'Draw',
+    description: 'Sticky drawing tools — click to pin, click again to close',
+    childrenType: 'sticky',
+    followChild: true,
+    selectedCommand: 'draw.line',
+    children: [
+      {
+        icon: markRaw(Minus),
+        text: 'Line',
+        command: 'draw.line',
+        description: 'Draw a line'
+      },
+      {
+        icon: markRaw(Crop),
+        text: 'Rect',
+        command: 'draw.rect',
+        description: 'Draw a rectangle'
+      },
+      {
+        icon: markRaw(Aim),
+        text: 'Circle',
+        command: 'draw.circle',
+        description: 'Draw a circle'
+      }
+    ]
+  },
+
+  /**
+   * =========================
+   * Edit (dismissible sub-toolbar)
+   * Clicking the canvas or another area closes it.
    * =========================
    */
   {
     icon: markRaw(Edit),
     text: 'Edit',
-    description: 'Edit related operations',
+    description: 'Dismissible edit tools — click canvas to close',
+    childrenType: 'dismissible',
     children: [
       {
         icon: markRaw(CopyDocument),
@@ -95,21 +138,18 @@ const toolBarData = reactive<MlButtonData[]>([
 
   /**
    * =========================
-   * Search / Zoom (has sub toolbar)
+   * View (popover menu + followChild)
+   * Shows a menu instead of a toolbar. Clicking the canvas closes it.
    * =========================
    */
   {
-    icon: markRaw(Search),
-    text: 'Search',
-    description: 'Search & navigation tools',
+    icon: markRaw(ZoomIn),
+    text: 'View',
+    description: 'View commands as a popover menu',
+    childrenType: 'menu',
+    followChild: true,
+    selectedCommand: 'view.zoomIn',
     children: [
-      {
-        icon: markRaw(Search),
-        text: 'Find',
-        command: 'search.find',
-        description: 'Find entities by property'
-      },
-      { type: 'separator' },
       {
         icon: markRaw(ZoomIn),
         text: 'Zoom In',
@@ -121,6 +161,19 @@ const toolBarData = reactive<MlButtonData[]>([
         text: 'Zoom Out',
         command: 'view.zoomOut',
         description: 'Zoom out drawing'
+      },
+      { type: 'separator' },
+      {
+        icon: markRaw(FullScreen),
+        text: 'Fit',
+        command: 'view.fit',
+        description: 'Fit drawing to view'
+      },
+      {
+        icon: markRaw(ScaleToOriginal),
+        text: 'Actual',
+        command: 'view.actual',
+        description: 'Zoom to actual size'
       }
     ]
   }

@@ -19,7 +19,7 @@ export {
 export type { MlDropdownMenuItem } from './components/MlDropdown.vue'
 export type { MlOverflowTab } from './components/MlOverflowTab'
 export type { MlToggleButtonData } from './components/MlToggleButton.vue'
-export type { MlButtonData } from './components/MlToolBar.vue'
+export type { MlButtonData, MlSubToolbarType } from './components/MlToolBar.vue'
 export type {
   MlToolPaletteDockSide,
   MlToolPaletteTab
