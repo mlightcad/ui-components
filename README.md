@@ -315,11 +315,15 @@ export interface MlButtonData {
   childrenType?: 'sticky' | 'dismissible' | 'menu'
   /**
    * When true, children represent a selection. After a child is chosen, this
-   * button's icon, text, and tooltip follow that child.
+   * button's icon, text, and tooltip follow that child. The chosen child's
+   * `command` is written back to `selectedCommand` on this item so the
+   * selection lives in the button data (survives item reordering and stays in
+   * sync across toolbars that share the same `items`).
    */
   followChild?: boolean
   /**
-   * Initial selected child `command` when `followChild` is true.
+   * Selected child `command` when `followChild` is true. Source of truth for
+   * the parent appearance; updated when the user picks a child.
    */
   selectedCommand?: string
   /**
@@ -539,4 +543,4 @@ Buttons with `children` open on **click**. Only one child popover is open at a t
 - Toggle buttons, sub-toolbars, and separators can coexist with normal buttons
 - Toggle state is internally managed by the toolbar (uncontrolled by default)
 - Insert `{ type: 'separator' }` in `items` or `children` to add a divider between buttons
-- Set `followChild: true` so the parent icon (and text/tooltip) tracks the last selected child. Use `selectedCommand` for the initial selection.
+- Set `followChild: true` so the parent icon (and text/tooltip) tracks the selected child. Keep the current selection in `selectedCommand` on the button data (the toolbar updates it when a child is picked).

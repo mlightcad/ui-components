@@ -39,13 +39,13 @@
                 <el-button
                   class="ml-toolbar-button"
                   :class="{
-                    'is-selected': isChildSelected(item, index, child)
+                    'is-selected': isChildSelected(item, child)
                   }"
                   :style="{
                     width: buttonSize + 'px',
                     height: buttonSize + 'px'
                   }"
-                  @click="handleSubCommand(item, index, child)"
+                  @click="handleSubCommand(item, child)"
                 >
                   <div>
                     <el-icon :size="buttonIconSize">
@@ -71,9 +71,9 @@
               <li
                 v-else
                 class="ml-toolbar-menu-item"
-                :class="{ 'is-selected': isChildSelected(item, index, child) }"
+                :class="{ 'is-selected': isChildSelected(item, child) }"
                 role="menuitem"
-                @click="handleSubCommand(item, index, child)"
+                @click="handleSubCommand(item, child)"
               >
                 <el-icon :size="menuIconSize">
                   <component :is="resolvedIcon(child)" />
@@ -100,17 +100,17 @@
               @click="handleParentClick(index)"
             >
               <el-tooltip
-                :content="buttonTooltip(item, index)"
+                :content="buttonTooltip(item)"
                 :auto-close="3000"
                 :show-after="1000"
                 :hide-after="0"
               >
                 <div>
                   <el-icon :size="buttonIconSize">
-                    <component :is="resolvedIcon(item, index)" />
+                    <component :is="resolvedIcon(item)" />
                   </el-icon>
                   <div v-if="isShowButtonText" class="ml-toolbar-button-text">
-                    {{ resolvedText(item, index) }}
+                    {{ resolvedText(item) }}
                   </div>
                 </div>
               </el-tooltip>
@@ -227,11 +227,16 @@ export interface MlButtonData {
   childrenType?: MlSubToolbarType
   /**
    * When true, children represent a selection. After a child is chosen, this
-   * button's icon, text, and tooltip follow that child.
+   * button's icon, text, and tooltip follow that child. The chosen child's
+   * `command` is written back to {@link selectedCommand} on this item so the
+   * selection lives in the button data (survives item reordering and stays in
+   * sync across toolbars that share the same `items`).
    */
   followChild?: boolean
   /**
-   * Initial selected child `command` when {@link followChild} is true.
+   * Selected child `command` when {@link followChild} is true. Used as the
+   * source of truth for the parent appearance; updated when the user picks a
+   * child.
    */
   selectedCommand?: string
   /**
@@ -452,14 +457,6 @@ onBeforeUnmount(() => {
  */
 const toggleStateMap = ref<Record<string, boolean>>({})
 
-/**
- * Last selected child command for parents with {@link MlButtonData.followChild}.
- */
-const selectedChildCommandMap = ref<Record<string, string>>({})
-
-const parentStateKey = (item: MlButtonData, index: number) =>
-  item.command ?? `__parent_${index}`
-
 const initToggleState = (items: MlButtonData[]) => {
   items.forEach(item => {
     if (item.command && item.toggle) {
@@ -475,22 +472,10 @@ const initToggleState = (items: MlButtonData[]) => {
   })
 }
 
-const initFollowChildState = (items: MlButtonData[]) => {
-  items.forEach((item, index) => {
-    if (!item.followChild) return
-    const key = parentStateKey(item, index)
-    if (selectedChildCommandMap.value[key] !== undefined) return
-    if (item.selectedCommand) {
-      selectedChildCommandMap.value[key] = item.selectedCommand
-    }
-  })
-}
-
 watch(
   () => props.items,
   items => {
     initToggleState(items)
-    initFollowChildState(items)
   },
   { immediate: true }
 )
@@ -517,40 +502,28 @@ const handleItemClick = (item: MlButtonData) => {
   }
 }
 
-const handleSubCommand = (
-  parent: MlButtonData,
-  parentIndex: number,
-  child: MlButtonData
-) => {
+const handleSubCommand = (parent: MlButtonData, child: MlButtonData) => {
   handleItemClick(child)
   if (parent.followChild && child.command) {
-    selectedChildCommandMap.value[parentStateKey(parent, parentIndex)] =
-      child.command
+    parent.selectedCommand = child.command
   }
   if (!isSticky(parent)) {
     closePopover()
   }
 }
 
-const selectedChild = (item: MlButtonData, index: number) => {
-  if (!item.followChild || !item.children?.length) return undefined
-  const command = selectedChildCommandMap.value[parentStateKey(item, index)]
-  if (!command) return undefined
+const selectedChild = (item: MlButtonData) => {
+  if (!item.followChild || !item.children?.length || !item.selectedCommand) {
+    return undefined
+  }
   return item.children.find(
-    child => !isSeparator(child) && child.command === command
+    child => !isSeparator(child) && child.command === item.selectedCommand
   )
 }
 
-const isChildSelected = (
-  parent: MlButtonData,
-  parentIndex: number,
-  child: MlButtonData
-) => {
+const isChildSelected = (parent: MlButtonData, child: MlButtonData) => {
   if (!parent.followChild || !child.command) return false
-  return (
-    selectedChildCommandMap.value[parentStateKey(parent, parentIndex)] ===
-    child.command
-  )
+  return parent.selectedCommand === child.command
 }
 
 /**
@@ -586,33 +559,27 @@ const appearanceTooltip = (item: MlButtonData) => {
 /**
  * Resolve icon (toggle-aware, followChild-aware for parents)
  */
-const resolvedIcon = (item: MlButtonData, index?: number) => {
-  if (typeof index === 'number') {
-    const child = selectedChild(item, index)
-    if (child) return appearanceIcon(child)
-  }
+const resolvedIcon = (item: MlButtonData) => {
+  const child = selectedChild(item)
+  if (child) return appearanceIcon(child)
   return appearanceIcon(item)
 }
 
 /**
  * Resolve text (toggle-aware, followChild-aware for parents)
  */
-const resolvedText = (item: MlButtonData, index?: number) => {
-  if (typeof index === 'number') {
-    const child = selectedChild(item, index)
-    if (child) return appearanceText(child)
-  }
+const resolvedText = (item: MlButtonData) => {
+  const child = selectedChild(item)
+  if (child) return appearanceText(child)
   return appearanceText(item)
 }
 
 /**
  * Resolve tooltip (toggle-aware, followChild-aware for parents)
  */
-const buttonTooltip = (item: MlButtonData, index?: number) => {
-  if (typeof index === 'number') {
-    const child = selectedChild(item, index)
-    if (child) return appearanceTooltip(child)
-  }
+const buttonTooltip = (item: MlButtonData) => {
+  const child = selectedChild(item)
+  if (child) return appearanceTooltip(child)
   return appearanceTooltip(item)
 }
 

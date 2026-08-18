@@ -35,7 +35,8 @@ const toolBarData = reactive<MlButtonData[]>([
    * =========================
    * Draw (sticky + followChild)
    * Parent button toggles the sub-toolbar. Clicking the canvas does not
-   * close it. Choosing a child updates the parent icon.
+   * close it. Choosing a child updates selectedCommand on this item, so
+   * both toolbars that share toolBarData stay in sync.
    * =========================
    */
   {
@@ -140,6 +141,7 @@ const toolBarData = reactive<MlButtonData[]>([
    * =========================
    * View (popover menu + followChild)
    * Shows a menu instead of a toolbar. Clicking the canvas closes it.
+   * selectedCommand is shared via toolBarData with the other toolbar.
    * =========================
    */
   {
