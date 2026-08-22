@@ -99,6 +99,7 @@ import {
   watch
 } from 'vue'
 
+import { useLocale } from '../locale'
 import type { MlOverflowTab } from './MlOverflowTab'
 
 export type { MlOverflowTab } from './MlOverflowTab'
@@ -109,9 +110,15 @@ const DEFAULT_ACTIONS_WIDTH = 28
 const props = withDefaults(
   defineProps<{
     tabs: MlOverflowTab[]
-    /** Optional aria/title for the overflow button. */
+    /**
+     * Optional aria/title for the overflow button.
+     * Falls back to the current locale (`overflowTabs.moreTabs`).
+     */
     moreTabsLabel?: string
-    /** Optional aria/title for tab close buttons. */
+    /**
+     * Optional aria/title for tab close buttons.
+     * Falls back to the current locale (`overflowTabs.closeTab`).
+     */
     closeTabLabel?: string
     /**
      * Show close buttons on tabs. Individual tabs can override via
@@ -125,8 +132,8 @@ const props = withDefaults(
     actionsWidth?: number
   }>(),
   {
-    moreTabsLabel: 'More tabs',
-    closeTabLabel: 'Close tab',
+    moreTabsLabel: undefined,
+    closeTabLabel: undefined,
     closable: false,
     actionsWidth: undefined
   }
@@ -141,12 +148,14 @@ const slots = useSlots()
 
 const hasActions = computed(() => !!slots.actions)
 
+const { locale } = useLocale()
+
 const resolvedMoreTabsLabel = computed(
-  () => props.moreTabsLabel || 'More tabs'
+  () => props.moreTabsLabel ?? locale.value.overflowTabs.moreTabs
 )
 
 const resolvedCloseTabLabel = computed(
-  () => props.closeTabLabel || 'Close tab'
+  () => props.closeTabLabel ?? locale.value.overflowTabs.closeTab
 )
 
 const resolvedActionsWidth = computed(() => {

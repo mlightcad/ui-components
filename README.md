@@ -544,3 +544,53 @@ Buttons with `children` open on **click**. Only one child popover is open at a t
 - Toggle state is internally managed by the toolbar (uncontrolled by default)
 - Insert `{ type: 'separator' }` in `items` or `children` to add a divider between buttons
 - Set `followChild: true` so the parent icon (and text/tooltip) tracks the selected child. Keep the current selection in `selectedCommand` on the button data (the toolbar updates it when a child is picked).
+
+## Internationalization
+
+Built-in chrome strings (dock-side menu labels, overflow-tab aria labels, etc.) default to English. Consuming apps can translate them without wrapping every component.
+
+**Global locale** — applies to all instances:
+
+```ts
+import { setLocale } from '@mlightcad/ui-components'
+
+setLocale('zh')
+setLocale('en')
+```
+
+**Plugin option:**
+
+```ts
+import UiComponents from '@mlightcad/ui-components'
+
+app.use(UiComponents, { locale: 'zh' })
+```
+
+**Vue tree** — call `provideLocale` in a component `setup()` / `<script setup>` (Vue `provide` only works there). Useful with vue-i18n or cad-viewer's locale:
+
+```ts
+import { computed } from 'vue'
+import { provideLocale } from '@mlightcad/ui-components'
+
+const locale = computed(() => i18n.locale.value) // 'en' | 'zh' | 'zh-cn' | 'tr' | 'cs' | 'ar'
+provideLocale(locale)
+```
+
+**Per-instance props** still override the active locale:
+
+```vue
+<ml-tool-palette
+  more-menu-label="停靠位置"
+  :dock-side-labels="{
+    float: '取消停靠',
+    left: '停靠到左侧',
+    top: '停靠到顶部',
+    bottom: '停靠到底部',
+    right: '停靠到右侧'
+  }"
+/>
+```
+
+Packs shipped with the library (same ids as cad-viewer): `en`, `zh`, `tr`, `cs`, `ar`. `'zh-cn'` / `'zh-CN'` are accepted as aliases of `'zh'`. You can also pass a pack object or a partial object to `setLocale` / `mergeLocale`; omitted keys keep the English default.
+
+App-owned copy (tab titles, toolbar button text, dropdown items) is already passed in as data, so it stays the application's responsibility.

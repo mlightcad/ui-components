@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { Menu as IconMenu } from '@element-plus/icons-vue'
 import {
+  isMlLocaleName,
   MlDropdownMenuItem,
   MlLanguage,
   MlToolPalette,
-  MlToolPaletteTab
+  MlToolPaletteTab,
+  setLocale
 } from '@mlightcad/ui-components'
 import { ref } from 'vue'
 import { reactive } from 'vue'
@@ -14,16 +16,19 @@ import { toggleDark } from '~/composables'
 const dialogVisible = ref(false)
 const toolPaletteVisible = ref<boolean>(true)
 const activeTab = ref<string>('blocks')
+const currentLang = ref('en')
 const data = reactive<MlDropdownMenuItem[]>([
-  {
-    name: 'en',
-    text: 'English'
-  },
-  {
-    name: 'zh',
-    text: '中文'
-  }
+  { name: 'en', text: 'English' },
+  { name: 'zh', text: '简体中文' },
+  { name: 'tr', text: 'Türkçe' },
+  { name: 'cs', text: 'Čeština' },
+  { name: 'ar', text: 'العربية' }
 ])
+
+const handleLanguageClick = (lang: string) => {
+  currentLang.value = lang
+  if (isMlLocaleName(lang)) setLocale(lang)
+}
 
 const tabs = reactive<MlToolPaletteTab[]>([
   {
@@ -102,7 +107,11 @@ const handleDockChange = (side: string) => {
       </button>
     </el-menu-item>
     <el-menu-item>
-      <ml-language :languages="data" current="en" />
+      <ml-language
+        :languages="data"
+        :current="currentLang"
+        @click="handleLanguageClick"
+      />
     </el-menu-item>
   </el-menu>
   <ml-tool-palette

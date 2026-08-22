@@ -56,8 +56,8 @@
             <el-icon
               :size="18"
               class="ml-tool-palette-dialog-icon ml-tool-palette-dock-btn"
-              :title="moreMenuLabel"
-              :aria-label="moreMenuLabel"
+              :title="resolvedMoreMenuLabel"
+              :aria-label="resolvedMoreMenuLabel"
               role="button"
               tabindex="0"
               @mousedown.stop
@@ -207,7 +207,7 @@
                         fill="currentColor"
                       />
                     </svg>
-                    <span>{{ dockSideTitles[side] }}</span>
+                    <span>{{ resolvedDockSideTitles[side] }}</span>
                   </span>
                 </el-dropdown-item>
               </el-dropdown-menu>
@@ -272,6 +272,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { DockSide, WIDTH_OF_TITLE_BAR } from '../composables/types'
 import { useBoundingRect } from '../composables/useBoundingRect'
 import { DragOptions } from '../composables/useDrag'
+import { useLocale } from '../locale'
 import MlCollapse from './MlCollapse.vue'
 import type { MlOverflowTab } from './MlOverflowTab'
 import MlOverflowTabs from './MlOverflowTabs.vue'
@@ -351,9 +352,14 @@ interface Props {
   dockSides?: DockSide[]
   /**
    * Accessible label for the dock menu button.
-   * @default 'Dock side'
+   * Falls back to the current locale (`toolPalette.moreMenu`).
    */
   moreMenuLabel?: string
+  /**
+   * Override labels for dock-side menu items.
+   * Unspecified sides fall back to the current locale (`toolPalette.dock`).
+   */
+  dockSideLabels?: Partial<Record<DockSide, string>>
   /**
    * Whether tabs show a close button by default.
    * Individual tabs can override via {@link MlToolPaletteTab.closable}.
@@ -397,7 +403,8 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   showDockMenu: true,
   dockSides: undefined,
-  moreMenuLabel: 'Dock side',
+  moreMenuLabel: undefined,
+  dockSideLabels: undefined,
   closable: true
 })
 // Flag to control whether the tool palette is visible
@@ -408,13 +415,23 @@ const activeTab = defineModel<string>('activeTab', { default: '' })
 const dockSideModel = defineModel<DockSide | undefined>('dockSide')
 const emit = defineEmits<Events>()
 
-const dockSideTitles: Record<DockSide, string> = {
-  float: 'Undock into separate window',
-  left: 'Dock to left',
-  top: 'Dock to top',
-  bottom: 'Dock to bottom',
-  right: 'Dock to right'
-}
+const { locale } = useLocale()
+
+const resolvedMoreMenuLabel = computed(
+  () => props.moreMenuLabel ?? locale.value.toolPalette.moreMenu
+)
+
+const resolvedDockSideTitles = computed<Record<DockSide, string>>(() => {
+  const labels = props.dockSideLabels
+  const dock = locale.value.toolPalette.dock
+  return {
+    float: labels?.float ?? dock.float,
+    left: labels?.left ?? dock.left,
+    top: labels?.top ?? dock.top,
+    bottom: labels?.bottom ?? dock.bottom,
+    right: labels?.right ?? dock.right
+  }
+})
 
 // Check if tabs are provided
 const hasTabs = computed(() => {
@@ -532,8 +549,7 @@ const {
 const currentDockSide = computed<DockSide>(() => internalDockSide.value)
 
 const isHorizontalDocked = computed(
-  () =>
-    currentDockSide.value === 'top' || currentDockSide.value === 'bottom'
+  () => currentDockSide.value === 'top' || currentDockSide.value === 'bottom'
 )
 
 const collapseDirection = computed<'horizontal' | 'vertical'>(() =>
@@ -542,8 +558,7 @@ const collapseDirection = computed<'horizontal' | 'vertical'>(() =>
 
 /** Right / bottom docks flip the collapse arrow direction. */
 const collapseReverse = computed(
-  () =>
-    currentDockSide.value === 'right' || currentDockSide.value === 'bottom'
+  () => currentDockSide.value === 'right' || currentDockSide.value === 'bottom'
 )
 
 const orientationClass = computed(() => {
@@ -558,35 +573,26 @@ const orientationClass = computed(() => {
 
 const dockMenuPlacement = computed(() => {
   if (orientationClass.value === 'right') return 'left-start'
-  if (
-    orientationClass.value === 'top' ||
-    orientationClass.value === 'bottom'
-  ) {
+  if (orientationClass.value === 'top' || orientationClass.value === 'bottom') {
     return 'bottom-start'
   }
   return 'right-start'
 })
 
 // Keep optional v-model:dock-side in sync with drag/menu changes
-watch(
-  internalDockSide,
-  (side, prev) => {
-    if (side === prev) return
-    if (dockSideModel.value !== side) {
-      dockSideModel.value = side
-    }
-    emit('dock-change', side)
+watch(internalDockSide, (side, prev) => {
+  if (side === prev) return
+  if (dockSideModel.value !== side) {
+    dockSideModel.value = side
   }
-)
+  emit('dock-change', side)
+})
 
 // Apply external v-model:dock-side
-watch(
-  dockSideModel,
-  side => {
-    if (side == null || side === internalDockSide.value) return
-    setDockSide(side)
-  }
-)
+watch(dockSideModel, side => {
+  if (side == null || side === internalDockSide.value) return
+  setDockSide(side)
+})
 
 // Resized style for container — guard undefined until useInitialRect runs so
 // invalid `undefinedpx` values do not fall through to CSS `left` and snap the
