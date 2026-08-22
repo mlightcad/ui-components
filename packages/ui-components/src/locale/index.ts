@@ -13,7 +13,12 @@ import { ar } from './ar'
 import { cs } from './cs'
 import { en } from './en'
 import { tr } from './tr'
-import type { MlLocale, MlLocaleName, MlLocalePartial } from './types'
+import type {
+  MlLocale,
+  MlLocaleId,
+  MlLocaleName,
+  MlLocalePartial
+} from './types'
 import { zh } from './zh'
 
 export { ar } from './ar'
@@ -23,7 +28,7 @@ export { tr } from './tr'
 export { zh } from './zh'
 /** @deprecated Use {@link zh}. Kept as an alias of the `'zh'` pack. */
 export { zh as zhCn } from './zh'
-export type { MlLocale, MlLocaleName, MlLocalePartial } from './types'
+export type { MlLocale, MlLocaleId, MlLocaleName, MlLocalePartial } from './types'
 
 /** Built-in packs keyed by cad-viewer locale id. */
 export const locales: Record<MlLocaleName, MlLocale> = {
@@ -34,10 +39,20 @@ export const locales: Record<MlLocaleName, MlLocale> = {
   ar
 }
 
-const LOCALE_NAMES = new Set<string>(Object.keys(locales))
+/** Non-canonical ids that resolve to a shipped pack. */
+const LOCALE_ALIASES: Record<string, MlLocaleName> = {
+  'zh-cn': 'zh'
+}
 
-export function isMlLocaleName(value: string): value is MlLocaleName {
-  return LOCALE_NAMES.has(value)
+function canonicalLocaleName(value: string): MlLocaleName | undefined {
+  if (Object.prototype.hasOwnProperty.call(locales, value)) {
+    return value as MlLocaleName
+  }
+  return LOCALE_ALIASES[value.toLowerCase()]
+}
+
+export function isMlLocaleName(value: string): value is MlLocaleId {
+  return canonicalLocaleName(value) != null
 }
 
 /** Injection key used by {@link provideLocale} / {@link useLocale}. */
@@ -45,7 +60,7 @@ export const localeContextKey: InjectionKey<Ref<MlLocale>> = Symbol('mlLocale')
 
 const globalLocale = ref<MlLocale>(en)
 
-export type MlLocaleInput = MlLocaleName | MlLocale | MlLocalePartial
+export type MlLocaleInput = MlLocaleId | MlLocale | MlLocalePartial
 
 /**
  * Merge a partial locale onto a base pack. Missing keys keep the base value.
@@ -70,7 +85,8 @@ export function mergeLocale(base: MlLocale, patch?: MlLocalePartial): MlLocale {
 
 function resolveLocale(locale: MlLocaleInput): MlLocale {
   if (typeof locale === 'string') {
-    return locales[locale] ?? en
+    const name = canonicalLocaleName(locale)
+    return name ? locales[name] : en
   }
   return mergeLocale(en, locale)
 }
@@ -80,12 +96,14 @@ function resolveLocale(locale: MlLocaleInput): MlLocale {
  * nearer {@link provideLocale} in the Vue tree.
  *
  * Accepts a cad-viewer locale id (`'en'` | `'zh'` | `'tr'` | `'cs'` | `'ar'`),
- * a full pack, or a partial pack merged onto English defaults.
+ * the `'zh-cn'` / `'zh-CN'` alias of `'zh'`, a full pack, or a partial pack
+ * merged onto English defaults.
  *
  * @example
  * ```ts
  * import { setLocale } from '@mlightcad/ui-components'
  * setLocale('zh')
+ * setLocale('zh-cn')
  * ```
  */
 export function setLocale(locale: MlLocaleInput) {
@@ -98,11 +116,15 @@ export function getLocale(): MlLocale {
 }
 
 /**
- * Provide a locale for the current component tree. Accepts a ref or computed
- * so the UI updates when the app language changes.
+ * Provide a locale for the current component tree. Must be called
+ * synchronously during `setup()` (including `<script setup>`); Vue `provide`
+ * does not work outside that context.
+ *
+ * Accepts a ref or computed so the UI updates when the app language changes.
  *
  * @example
  * ```ts
+ * // in setup() or <script setup>
  * const locale = computed(() => i18n.locale.value)
  * provideLocale(locale)
  * ```

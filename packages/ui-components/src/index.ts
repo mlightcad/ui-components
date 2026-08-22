@@ -49,7 +49,13 @@ export {
   zh,
   zhCn
 } from './locale'
-export type { MlLocale, MlLocaleInput, MlLocaleName, MlLocalePartial } from './locale'
+export type {
+  MlLocale,
+  MlLocaleId,
+  MlLocaleInput,
+  MlLocaleName,
+  MlLocalePartial
+} from './locale'
 
 export interface MlUiComponentsOptions {
   /** Default locale for built-in chrome strings. Locale id, pack, or partial. */

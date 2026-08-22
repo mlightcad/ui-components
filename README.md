@@ -566,13 +566,13 @@ import UiComponents from '@mlightcad/ui-components'
 app.use(UiComponents, { locale: 'zh' })
 ```
 
-**Vue tree** — useful with vue-i18n or cad-viewer's locale:
+**Vue tree** — call `provideLocale` in a component `setup()` / `<script setup>` (Vue `provide` only works there). Useful with vue-i18n or cad-viewer's locale:
 
 ```ts
 import { computed } from 'vue'
 import { provideLocale } from '@mlightcad/ui-components'
 
-const locale = computed(() => i18n.locale.value) // 'en' | 'zh' | 'tr' | 'cs' | 'ar'
+const locale = computed(() => i18n.locale.value) // 'en' | 'zh' | 'zh-cn' | 'tr' | 'cs' | 'ar'
 provideLocale(locale)
 ```
 
@@ -591,6 +591,6 @@ provideLocale(locale)
 />
 ```
 
-Packs shipped with the library (same ids as cad-viewer): `en`, `zh`, `tr`, `cs`, `ar`. You can also pass a pack object or a partial object to `setLocale` / `mergeLocale`; omitted keys keep the English default.
+Packs shipped with the library (same ids as cad-viewer): `en`, `zh`, `tr`, `cs`, `ar`. `'zh-cn'` / `'zh-CN'` are accepted as aliases of `'zh'`. You can also pass a pack object or a partial object to `setLocale` / `mergeLocale`; omitted keys keep the English default.
 
 App-owned copy (tab titles, toolbar button text, dropdown items) is already passed in as data, so it stays the application's responsibility.
