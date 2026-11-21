@@ -53,7 +53,6 @@
                 :key="tab.name"
                 :command="tab.name"
                 :class="{ 'is-selected': activeTab === tab.name }"
-                @click.stop="selectTab(tab.name)"
               >
                 <span class="ml-overflow-tab-overflow-item">
                   <span class="ml-overflow-tab-label">{{ tab.label }}</span>
@@ -168,6 +167,8 @@ const tabsWrapRef = ref<HTMLElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
 const overflowTabIds = ref<string[]>([])
 const tabButtonRefs = new Map<string, HTMLElement>()
+/** Last known positive widths; bridges transient 0-width measure frames. */
+const tabWidthCache = new Map<string, number>()
 let tabOverflowFrame: number | undefined
 let tabOverflowObserver: ResizeObserver | undefined
 let tabOverflowGeneration = 0
@@ -187,6 +188,26 @@ const setTabButtonRef = (name: string, el: unknown) => {
   if (el instanceof HTMLElement) tabButtonRefs.set(name, el)
 }
 
+const pruneTabButtonRefs = (tabList: MlOverflowTab[]) => {
+  const names = new Set(tabList.map(tab => tab.name))
+  for (const name of [...tabButtonRefs.keys()]) {
+    if (names.has(name)) continue
+    tabButtonRefs.delete(name)
+    tabWidthCache.delete(name)
+  }
+}
+
+const readTabWidth = (name: string) => {
+  const el = tabButtonRefs.get(name)
+  // Detached nodes (stale refs between null/rebind) report 0.
+  const live = el?.isConnected ? el.offsetWidth : 0
+  if (live > 0) {
+    tabWidthCache.set(name, live)
+    return live
+  }
+  return tabWidthCache.get(name) ?? 0
+}
+
 const isTabClosable = (tab: MlOverflowTab) => {
   return tab.closable ?? props.closable
 }
@@ -201,15 +222,15 @@ const selectTab = (tabName: unknown) => {
     overflowTabIds.value = overflowTabIds.value.filter(id => id !== tabName)
   }
   activeTab.value = tabName
-  tabOverflowRetries = 0
-  rescheduleUpdateTabOverflow()
+  rescheduleUpdateTabOverflow({ resetRetries: true })
 }
 
 const closeTab = (tabName: string) => {
   emit('tab-close', tabName)
 }
 
-const scheduleUpdateTabOverflow = () => {
+const scheduleUpdateTabOverflow = (options?: { resetRetries?: boolean }) => {
+  if (options?.resetRetries !== false) tabOverflowRetries = 0
   if (tabOverflowFrame !== undefined) return
   tabOverflowFrame = requestAnimationFrame(() => {
     tabOverflowFrame = undefined
@@ -217,23 +238,25 @@ const scheduleUpdateTabOverflow = () => {
   })
 }
 
-const rescheduleUpdateTabOverflow = () => {
+const rescheduleUpdateTabOverflow = (options?: { resetRetries?: boolean }) => {
   if (tabOverflowFrame !== undefined) {
     cancelAnimationFrame(tabOverflowFrame)
     tabOverflowFrame = undefined
   }
-  scheduleUpdateTabOverflow()
+  scheduleUpdateTabOverflow(options)
 }
 
 const updateTabOverflow = async () => {
   const generation = ++tabOverflowGeneration
   const wrap = tabsWrapRef.value
   const tabList = props.tabs
+  pruneTabButtonRefs(tabList)
   if (!wrap || tabList.length === 0) {
     overflowTabIds.value = []
     return
   }
 
+  const previousOverflow = overflowTabIds.value
   // Measure with all tabs visible (same approach as dock panel).
   overflowTabIds.value = []
   await nextTick()
@@ -241,24 +264,28 @@ const updateTabOverflow = async () => {
   if (generation !== tabOverflowGeneration) return
 
   const wrapWidth = wrap.clientWidth
-  if (wrapWidth <= 0) return
+  if (wrapWidth <= 0) {
+    overflowTabIds.value = previousOverflow
+    return
+  }
 
   const actionsWidth =
     actionsRef.value?.offsetWidth || resolvedActionsWidth.value
 
-  const widths = new Map(
-    tabList.map(tab => [
-      tab.name,
-      tabButtonRefs.get(tab.name)?.offsetWidth ?? 0
-    ])
-  )
-  // Hidden tabs and a ref cleared mid-render both report width 0. Laying
-  // out from that hides the tab the user just chose.
-  if (tabList.some(tab => (widths.get(tab.name) ?? 0) <= 0)) {
+  const widths = new Map(tabList.map(tab => [tab.name, readTabWidth(tab.name)]))
+  // No live or cached width yet (hidden tab / mid-rebind). Retry a few frames
+  // instead of laying out from zeros, which would hide the chosen tab.
+  const missingWidth = tabList.some(tab => (widths.get(tab.name) ?? 0) <= 0)
+  if (missingWidth) {
     if (tabOverflowRetries < 4) {
       tabOverflowRetries += 1
-      rescheduleUpdateTabOverflow()
+      overflowTabIds.value = previousOverflow
+      rescheduleUpdateTabOverflow({ resetRetries: false })
+      return
     }
+    // Give up this pass; keep the prior strip rather than showing a broken one.
+    tabOverflowRetries = 0
+    overflowTabIds.value = previousOverflow
     return
   }
   tabOverflowRetries = 0
@@ -321,30 +348,37 @@ const updateTabOverflow = async () => {
 
   await nextTick()
   if (generation !== tabOverflowGeneration) return
-  revealActiveTabIfClipped(wrap, tabList)
+  await revealActiveTabIfClipped(wrap, tabList, generation)
 }
 
 /**
  * The overflow button is hidden while tabs are measured, then shown again.
- * If that button is wider than the reserved slot, the active tab is the one
- * clipped by the strip. Hide one more leading tab so it stays on screen.
+ * If that button is wider than the reserved slot, the active tab can stay
+ * clipped. Keep hiding leading tabs until it fits (or nothing else can hide).
  */
-const revealActiveTabIfClipped = (
+const revealActiveTabIfClipped = async (
   wrap: HTMLElement,
-  tabList: MlOverflowTab[]
+  tabList: MlOverflowTab[],
+  generation: number
 ) => {
-  const activeId = activeTab.value
-  const activeEl = activeId ? tabButtonRefs.get(activeId) : undefined
   const list = wrap.querySelector<HTMLElement>('.ml-overflow-tabs-list')
-  if (!activeEl || !list || activeEl.hidden) return
-  const listRight = list.getBoundingClientRect().right
-  const tabRight = activeEl.getBoundingClientRect().right
-  if (tabRight <= listRight + 1) return
-  const leftmost = tabList.find(
-    tab => tab.name !== activeId && !overflowTabIds.value.includes(tab.name)
-  )
-  if (!leftmost) return
-  overflowTabIds.value = [...overflowTabIds.value, leftmost.name]
+  if (!list) return
+
+  for (let step = 0; step < tabList.length; step += 1) {
+    if (generation !== tabOverflowGeneration) return
+    const activeId = activeTab.value
+    const activeEl = activeId ? tabButtonRefs.get(activeId) : undefined
+    if (!activeEl || activeEl.hidden) return
+    const listRight = list.getBoundingClientRect().right
+    const tabRight = activeEl.getBoundingClientRect().right
+    if (tabRight <= listRight + 1) return
+    const leftmost = tabList.find(
+      tab => tab.name !== activeId && !overflowTabIds.value.includes(tab.name)
+    )
+    if (!leftmost) return
+    overflowTabIds.value = [...overflowTabIds.value, leftmost.name]
+    await nextTick()
+  }
 }
 
 watch(
