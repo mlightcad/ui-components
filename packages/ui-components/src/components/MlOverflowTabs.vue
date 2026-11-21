@@ -4,7 +4,7 @@
       <div ref="tabsWrapRef" class="ml-overflow-tabs-wrap">
         <div class="ml-overflow-tabs-list" role="tablist">
           <button
-            v-for="tab in tabs"
+            v-for="tab in stripTabs"
             :key="tab.name"
             :ref="
               (el: Element | ComponentPublicInstance | null) =>
@@ -13,10 +13,12 @@
             type="button"
             class="ml-overflow-tab"
             role="tab"
-            :hidden="!isMeasuring && overflowTabIds.includes(tab.name)"
-            :style="{ order: tabFlexOrder(tab.name) }"
             :aria-selected="activeTab === tab.name"
-            :class="{ 'is-active': activeTab === tab.name }"
+            :class="{
+              'is-active': activeTab === tab.name,
+              'is-overflow-hidden': isOverflowHidden(tab.name),
+              'is-measure-probe': isMeasureProbe(tab.name)
+            }"
             @click="selectTab(tab.name)"
           >
             <span class="ml-overflow-tab-label">{{ tab.label }}</span>
@@ -33,48 +35,57 @@
             </span>
           </button>
         </div>
-        <el-dropdown
-          v-show="overflowTabIds.length > 0"
-          trigger="click"
-          teleported
-          @command="selectTab"
+        <!--
+          Fixed-width gutter so » never shares pixels with the last title.
+          Collapses to 0 when every tab fits.
+        -->
+        <div
+          class="ml-overflow-tabs-more"
+          :class="{ 'is-visible': overflowTabIds.length > 0 }"
         >
-          <button
-            type="button"
-            class="ml-overflow-tab-overflow-btn"
-            :class="{ 'is-active': overflowContainsActive }"
-            :title="resolvedMoreTabsLabel"
-            :aria-label="resolvedMoreTabsLabel"
+          <el-dropdown
+            v-show="overflowTabIds.length > 0"
+            trigger="click"
+            teleported
+            @command="selectTab"
           >
-            »
-          </button>
-          <template #dropdown>
-            <el-dropdown-menu class="ml-overflow-tab-overflow-menu">
-              <el-dropdown-item
-                v-for="tab in overflowTabs"
-                :key="tab.name"
-                :command="tab.name"
-                :class="{ 'is-selected': activeTab === tab.name }"
-                @click="selectTab(tab.name)"
-              >
-                <span class="ml-overflow-tab-overflow-item">
-                  <span class="ml-overflow-tab-label">{{ tab.label }}</span>
-                  <span
-                    v-if="isTabClosable(tab)"
-                    class="ml-overflow-tab-close"
-                    role="button"
-                    tabindex="-1"
-                    :title="resolvedCloseTabLabel"
-                    :aria-label="resolvedCloseTabLabel"
-                    @click.stop.prevent="closeTab(tab.name)"
-                  >
-                    ×
+            <button
+              type="button"
+              class="ml-overflow-tab-overflow-btn"
+              :class="{ 'is-active': overflowContainsActive }"
+              :title="resolvedMoreTabsLabel"
+              :aria-label="resolvedMoreTabsLabel"
+            >
+              »
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu class="ml-overflow-tab-overflow-menu">
+                <el-dropdown-item
+                  v-for="tab in overflowTabs"
+                  :key="tab.name"
+                  :command="tab.name"
+                  :class="{ 'is-selected': activeTab === tab.name }"
+                  @click="selectTab(tab.name)"
+                >
+                  <span class="ml-overflow-tab-overflow-item">
+                    <span class="ml-overflow-tab-label">{{ tab.label }}</span>
+                    <span
+                      v-if="isTabClosable(tab)"
+                      class="ml-overflow-tab-close"
+                      role="button"
+                      tabindex="-1"
+                      :title="resolvedCloseTabLabel"
+                      :aria-label="resolvedCloseTabLabel"
+                      @click.stop.prevent="closeTab(tab.name)"
+                    >
+                      ×
+                    </span>
                   </span>
-                </span>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
         <div
           v-if="hasActions"
           ref="actionsRef"
@@ -109,6 +120,8 @@ export type { MlOverflowTab } from './MlOverflowTab'
 
 const OVERFLOW_BTN_WIDTH = 28
 const DEFAULT_ACTIONS_WIDTH = 28
+/** Sub-pixel / border slack so the last title never paints under ». */
+const LAYOUT_SLACK = 8
 
 const props = withDefaults(
   defineProps<{
@@ -170,9 +183,9 @@ const tabsWrapRef = ref<HTMLElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
 const overflowTabIds = ref<string[]>([])
 /**
- * While true, every tab is shown so widths can be read without clearing
- * {@link overflowTabIds}. Clearing that list mid-click unmounts ElDropdown
- * (`v-show`) and drops the overflow selection before it commits.
+ * While true, overflow tabs are taken out of flex flow and measured as
+ * off-strip probes — never shown in the title bar (that would duplicate the
+ * » menu). Overflow ids stay intact so ElDropdown is not torn down mid-click.
  */
 const isMeasuring = ref(false)
 /**
@@ -192,6 +205,7 @@ let tabOverflowGeneration = 0
 let tabOverflowRetries = 0
 
 const overflowTabs = computed(() => {
+  // Menu must only list titles that are hidden from the strip.
   return props.tabs.filter(tab => overflowTabIds.value.includes(tab.name))
 })
 
@@ -199,13 +213,27 @@ const overflowContainsActive = computed(() => {
   return overflowTabIds.value.includes(activeTab.value)
 })
 
-/** Flex order so a »-selected tab paints as the last title before ». */
-const tabFlexOrder = (name: string) => {
-  const index = props.tabs.findIndex(tab => tab.name === name)
-  if (isMeasuring.value || !pinActiveToEnd.value) return index
-  if (name === activeTab.value) return 10_000
-  return index
+const isOverflowHidden = (name: string) => {
+  return !isMeasuring.value && overflowTabIds.value.includes(name)
 }
+
+const isMeasureProbe = (name: string) => {
+  return isMeasuring.value && overflowTabIds.value.includes(name)
+}
+
+/**
+ * Render order for the title strip. When a » menu pick is pinned, move that
+ * tab to the end of the DOM so it sits immediately left of ». Keep this order
+ * while measuring too — flipping back to natural order mid-measure thrashs
+ * layout and makes » overlap the last title.
+ */
+const stripTabs = computed(() => {
+  if (!pinActiveToEnd.value) return props.tabs
+  const activeId = activeTab.value
+  const active = props.tabs.find(tab => tab.name === activeId)
+  if (!active) return props.tabs
+  return [...props.tabs.filter(tab => tab.name !== activeId), active]
+})
 
 const setTabButtonRef = (name: string, el: unknown) => {
   // Vue calls the previous inline ref with null when its identity changes.
@@ -285,8 +313,11 @@ const computeOverflowLayout = (
   let visible: string[]
   let pinToEnd = false
   if (leadingWindow.includes(activeId)) {
+    // Active already fits in the natural leading strip — keep list order.
     visible = leadingWindow
   } else {
+    // » pick (or any late tab): keep a leading prefix, then the active tab
+    // as the final visible title immediately before ».
     pinToEnd = true
     const activeWidth = widthOf(activeId)
     const budget = Math.max(0, availableWidth - activeWidth)
@@ -328,6 +359,15 @@ const rescheduleUpdateTabOverflow = (options?: { resetRetries?: boolean }) => {
   scheduleUpdateTabOverflow(options)
 }
 
+const readActionsWidth = () => {
+  const el = actionsRef.value
+  if (el?.isConnected) {
+    const width = el.getBoundingClientRect().width
+    if (width > 0) return width
+  }
+  return resolvedActionsWidth.value
+}
+
 const updateTabOverflow = async () => {
   const generation = ++tabOverflowGeneration
   const wrap = tabsWrapRef.value
@@ -335,30 +375,27 @@ const updateTabOverflow = async () => {
   pruneTabButtonRefs(tabList)
   if (!wrap || tabList.length === 0) {
     overflowTabIds.value = []
+    pinActiveToEnd.value = false
     isMeasuring.value = false
     return
   }
 
-  // Reveal every tab for width reads without clearing overflowTabIds (which
-  // would tear down an open overflow menu mid-selection).
+  // Probe overflow tabs off-flow (see is-measure-probe) so they never flash
+  // into the title bar while still listed in the » menu.
   isMeasuring.value = true
-  await nextTick()
-  // Wait for layout after un-hiding so offsetWidth is not a stale 0.
-  await new Promise<void>(resolve => {
-    requestAnimationFrame(() => resolve())
-  })
-  // A newer selection started while we were waiting. Its pass owns measuring.
-  if (generation !== tabOverflowGeneration) return
-
   try {
-    const list = wrap.querySelector<HTMLElement>('.ml-overflow-tabs-list')
-    const wrapWidth = wrap.clientWidth
-    const listWidth = list?.clientWidth ?? 0
-    if (wrapWidth <= 0 || listWidth <= 0) {
-      return
-    }
+    await nextTick()
+    await new Promise<void>(resolve => {
+      requestAnimationFrame(() => resolve())
+    })
+    if (generation !== tabOverflowGeneration) return
 
-    const widths = new Map(tabList.map(tab => [tab.name, readTabWidth(tab.name)]))
+    const wrapWidth = wrap.clientWidth
+    if (wrapWidth <= 0) return
+
+    const widths = new Map(
+      tabList.map(tab => [tab.name, readTabWidth(tab.name)])
+    )
     // No live or cached width yet (hidden tab / mid-rebind). Retry a few frames
     // instead of laying out from zeros, which would hide the chosen tab.
     const missingWidth = tabList.some(tab => (widths.get(tab.name) ?? 0) <= 0)
@@ -380,14 +417,12 @@ const updateTabOverflow = async () => {
       0
     )
 
-    const overflowBtnShown = overflowTabIds.value.length > 0
-    // If the » control is already mounted it already ate list space; restore
-    // that width when asking whether every tab would fit without it.
-    const tabsBudgetWithoutOverflowBtn = overflowBtnShown
-      ? listWidth + OVERFLOW_BTN_WIDTH
-      : listWidth
+    // Budget from the wrap, not list.clientWidth — list size depends on whether
+    // the » gutter is open and caused » to overlap the last title.
+    const actionsWidth = readActionsWidth()
+    const innerWidth = Math.max(0, wrapWidth - actionsWidth)
 
-    if (totalWidth <= tabsBudgetWithoutOverflowBtn) {
+    if (totalWidth <= innerWidth) {
       if (generation !== tabOverflowGeneration) return
       overflowTabIds.value = []
       pinActiveToEnd.value = false
@@ -395,11 +430,9 @@ const updateTabOverflow = async () => {
     }
 
     const activeId = activeTab.value || tabList[0].name
-    // listWidth already excludes a visible »; otherwise reserve one.
-    // Small slack avoids a late active tab sitting 1–2px under the ».
     const availableWidth = Math.max(
       0,
-      (overflowBtnShown ? listWidth : listWidth - OVERFLOW_BTN_WIDTH) - 4
+      innerWidth - OVERFLOW_BTN_WIDTH - LAYOUT_SLACK
     )
 
     if (generation !== tabOverflowGeneration) return
@@ -412,15 +445,15 @@ const updateTabOverflow = async () => {
     overflowTabIds.value = layout.overflowIds
     pinActiveToEnd.value = layout.pinActiveToEnd
 
-    // Clip checks must run with the real hidden set applied. While
-    // isMeasuring is true every tab is shown, so the active tab's
-    // getBoundingClientRect sits far past the list and the repair
-    // collapses the strip to only that tab (Agent/Script).
+    // Clip checks need the real hidden set (probes off).
     isMeasuring.value = false
     await nextTick()
     if (generation !== tabOverflowGeneration) return
     await revealActiveTabIfClipped(wrap, tabList, generation)
   } finally {
+    // Always release the measuring flag for this generation. Leaving it stuck
+    // true (early return before the old try block) put overflow titles back
+    // into the strip while they were still in the » menu.
     if (generation === tabOverflowGeneration) {
       isMeasuring.value = false
     }
@@ -428,8 +461,8 @@ const updateTabOverflow = async () => {
 }
 
 /**
- * After the overflow control mounts, the active tab can still sit under it.
- * Recompute with a tighter budget (same Chrome-style layout).
+ * After the overflow gutter opens, the active tab can still sit under the
+ * list's right edge. Recompute with a tighter budget (same Chrome-style layout).
  */
 const revealActiveTabIfClipped = async (
   wrap: HTMLElement,
@@ -443,12 +476,21 @@ const revealActiveTabIfClipped = async (
     if (generation !== tabOverflowGeneration) return
     const activeId = activeTab.value
     const activeEl = activeId ? tabButtonRefs.get(activeId) : undefined
-    if (!activeEl || activeEl.hidden) return
+    if (
+      !activeEl ||
+      activeEl.classList.contains('is-overflow-hidden') ||
+      !activeEl.isConnected
+    ) {
+      return
+    }
     const listRight = list.getBoundingClientRect().right
     const tabRight = activeEl.getBoundingClientRect().right
     const overflowPx = tabRight - listRight
     if (overflowPx <= 1) return
-    const tighter = Math.max(0, list.clientWidth - overflowPx - 4)
+    const tighter = Math.max(
+      0,
+      list.clientWidth - overflowPx - LAYOUT_SLACK
+    )
     const layout = computeOverflowLayout(
       tabList,
       lastTabWidths,
@@ -527,12 +569,27 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+  position: relative;
 }
 
-.ml-overflow-tabs-wrap :deep(.el-dropdown) {
-  flex: 0 0 auto;
-  display: inline-flex;
+.ml-overflow-tabs-more {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
   align-self: stretch;
+}
+
+.ml-overflow-tabs-more.is-visible {
+  flex: 0 0 28px;
+  width: 28px;
+  overflow: visible;
+}
+
+.ml-overflow-tabs-more :deep(.el-dropdown) {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
 }
 
 .ml-overflow-tabs-actions {
@@ -556,8 +613,18 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.ml-overflow-tab[hidden] {
-  display: none;
+.ml-overflow-tab.is-overflow-hidden {
+  display: none !important;
+}
+
+/* Off-flow width probe — must not occupy strip space or appear beside ». */
+.ml-overflow-tab.is-measure-probe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  display: inline-flex !important;
 }
 
 .ml-overflow-tab:hover {
