@@ -13,7 +13,7 @@
             type="button"
             class="ml-overflow-tab"
             role="tab"
-            :hidden="overflowTabIds.includes(tab.name)"
+            :hidden="!isMeasuring && overflowTabIds.includes(tab.name)"
             :aria-selected="activeTab === tab.name"
             :class="{ 'is-active': activeTab === tab.name }"
             @click="selectTab(tab.name)"
@@ -35,6 +35,7 @@
         <el-dropdown
           v-show="overflowTabIds.length > 0"
           trigger="click"
+          teleported
           @command="selectTab"
         >
           <button
@@ -167,6 +168,12 @@ const resolvedActionsWidth = computed(() => {
 const tabsWrapRef = ref<HTMLElement | null>(null)
 const actionsRef = ref<HTMLElement | null>(null)
 const overflowTabIds = ref<string[]>([])
+/**
+ * While true, every tab is shown so widths can be read without clearing
+ * {@link overflowTabIds}. Clearing that list mid-click unmounts ElDropdown
+ * (`v-show`) and drops the overflow selection before it commits.
+ */
+const isMeasuring = ref(false)
 const tabButtonRefs = new Map<string, HTMLElement>()
 /** Last known positive widths; bridges transient 0-width measure frames. */
 const tabWidthCache = new Map<string, number>()
@@ -218,16 +225,14 @@ const selectTab = (tabName: unknown) => {
   // command string is meaningful here.
   if (typeof tabName !== 'string') return
   if (!props.tabs.some(tab => tab.name === tabName)) return
-  // Show the chosen tab before the async measure. Selecting the tab that
-  // is already active does not notify the watcher, so a tab left in the
-  // overflow menu would otherwise stay hidden.
-  if (overflowTabIds.value.includes(tabName)) {
-    overflowTabIds.value = overflowTabIds.value.filter(id => id !== tabName)
-  }
+  // Drop in-flight measures that still hold a stale overflow snapshot.
+  tabOverflowGeneration += 1
   if (activeTab.value !== tabName) {
     activeTab.value = tabName
   }
-  // Always remeasure: same-value selects still need the active tab unhidden.
+  // Do not mutate overflowTabIds here: removing the clicked item (or
+  // clearing the list in measure) unmounts the open ElDropdown and can
+  // swallow the selection. Remeasure reveals the active tab instead.
   rescheduleUpdateTabOverflow({ resetRetries: true })
 }
 
@@ -259,80 +264,72 @@ const updateTabOverflow = async () => {
   pruneTabButtonRefs(tabList)
   if (!wrap || tabList.length === 0) {
     overflowTabIds.value = []
+    isMeasuring.value = false
     return
   }
 
-  const previousOverflow = overflowTabIds.value
-  // Measure with all tabs visible (same approach as dock panel).
-  overflowTabIds.value = []
+  // Reveal every tab for width reads without clearing overflowTabIds (which
+  // would tear down an open overflow menu mid-selection).
+  isMeasuring.value = true
   await nextTick()
-  // A newer selection started while we were waiting. Its pass owns the result.
+  // A newer selection started while we were waiting. Its pass owns measuring.
   if (generation !== tabOverflowGeneration) return
 
-  const wrapWidth = wrap.clientWidth
-  if (wrapWidth <= 0) {
-    overflowTabIds.value = previousOverflow
-    return
-  }
-
-  const actionsWidth =
-    actionsRef.value?.offsetWidth || resolvedActionsWidth.value
-
-  const widths = new Map(tabList.map(tab => [tab.name, readTabWidth(tab.name)]))
-  // No live or cached width yet (hidden tab / mid-rebind). Retry a few frames
-  // instead of laying out from zeros, which would hide the chosen tab.
-  const missingWidth = tabList.some(tab => (widths.get(tab.name) ?? 0) <= 0)
-  if (missingWidth) {
-    if (tabOverflowRetries < 4) {
-      tabOverflowRetries += 1
-      overflowTabIds.value = previousOverflow
-      rescheduleUpdateTabOverflow({ resetRetries: false })
+  try {
+    const list = wrap.querySelector<HTMLElement>('.ml-overflow-tabs-list')
+    const wrapWidth = wrap.clientWidth
+    const listWidth = list?.clientWidth ?? 0
+    if (wrapWidth <= 0 || listWidth <= 0) {
       return
     }
-    // Give up this pass; keep the prior strip rather than showing a broken one.
-    tabOverflowRetries = 0
-    overflowTabIds.value = previousOverflow
-    return
-  }
-  tabOverflowRetries = 0
 
-  const totalWidth = tabList.reduce(
-    (sum, tab) => sum + (widths.get(tab.name) ?? 0),
-    0
-  )
-
-  if (totalWidth + actionsWidth <= wrapWidth) {
-    if (generation !== tabOverflowGeneration) return
-    overflowTabIds.value = []
-    return
-  }
-
-  const activeId = activeTab.value || tabList[0].name
-  const availableWidth = wrapWidth - OVERFLOW_BTN_WIDTH - actionsWidth
-  const visible = new Set(tabList.map(tab => tab.name))
-  const hidden = new Set<string>()
-
-  const sumVisibleWidth = () =>
-    tabList
-      .filter(tab => visible.has(tab.name))
-      .reduce((sum, tab) => sum + (widths.get(tab.name) ?? 0), 0)
-
-  while (visible.size > 1 && sumVisibleWidth() > availableWidth) {
-    let hideId: string | undefined
-    for (let index = tabList.length - 1; index >= 0; index -= 1) {
-      const id = tabList[index].name
-      if (id === activeId || !visible.has(id)) continue
-      hideId = id
-      break
+    const widths = new Map(tabList.map(tab => [tab.name, readTabWidth(tab.name)]))
+    // No live or cached width yet (hidden tab / mid-rebind). Retry a few frames
+    // instead of laying out from zeros, which would hide the chosen tab.
+    const missingWidth = tabList.some(tab => (widths.get(tab.name) ?? 0) <= 0)
+    if (missingWidth) {
+      if (tabOverflowRetries < 4) {
+        tabOverflowRetries += 1
+        rescheduleUpdateTabOverflow({ resetRetries: false })
+        return
+      }
+      // Give up this pass; keep the prior strip rather than showing a broken one.
+      tabOverflowRetries = 0
+      return
     }
-    if (!hideId) break
-    visible.delete(hideId)
-    hidden.add(hideId)
-  }
+    tabOverflowRetries = 0
 
-  if (!visible.has(activeId)) {
-    hidden.delete(activeId)
-    visible.add(activeId)
+    const totalWidth = tabList.reduce(
+      (sum, tab) => sum + (widths.get(tab.name) ?? 0),
+      0
+    )
+
+    const overflowBtnShown = overflowTabIds.value.length > 0
+    // If the » control is already mounted it already ate list space; restore
+    // that width when asking whether every tab would fit without it.
+    const tabsBudgetWithoutOverflowBtn = overflowBtnShown
+      ? listWidth + OVERFLOW_BTN_WIDTH
+      : listWidth
+
+    if (totalWidth <= tabsBudgetWithoutOverflowBtn) {
+      if (generation !== tabOverflowGeneration) return
+      overflowTabIds.value = []
+      return
+    }
+
+    const activeId = activeTab.value || tabList[0].name
+    // listWidth already excludes a visible »; otherwise reserve one.
+    const availableWidth = overflowBtnShown
+      ? listWidth
+      : Math.max(0, listWidth - OVERFLOW_BTN_WIDTH)
+    const visible = new Set(tabList.map(tab => tab.name))
+    const hidden = new Set<string>()
+
+    const sumVisibleWidth = () =>
+      tabList
+        .filter(tab => visible.has(tab.name))
+        .reduce((sum, tab) => sum + (widths.get(tab.name) ?? 0), 0)
+
     while (visible.size > 1 && sumVisibleWidth() > availableWidth) {
       let hideId: string | undefined
       for (let index = tabList.length - 1; index >= 0; index -= 1) {
@@ -345,22 +342,42 @@ const updateTabOverflow = async () => {
       visible.delete(hideId)
       hidden.add(hideId)
     }
+
+    if (!visible.has(activeId)) {
+      hidden.delete(activeId)
+      visible.add(activeId)
+      while (visible.size > 1 && sumVisibleWidth() > availableWidth) {
+        let hideId: string | undefined
+        for (let index = tabList.length - 1; index >= 0; index -= 1) {
+          const id = tabList[index].name
+          if (id === activeId || !visible.has(id)) continue
+          hideId = id
+          break
+        }
+        if (!hideId) break
+        visible.delete(hideId)
+        hidden.add(hideId)
+      }
+    }
+
+    if (generation !== tabOverflowGeneration) return
+    overflowTabIds.value = tabList
+      .filter(tab => hidden.has(tab.name))
+      .map(tab => tab.name)
+
+    await nextTick()
+    if (generation !== tabOverflowGeneration) return
+    await revealActiveTabIfClipped(wrap, tabList, generation)
+  } finally {
+    if (generation === tabOverflowGeneration) {
+      isMeasuring.value = false
+    }
   }
-
-  if (generation !== tabOverflowGeneration) return
-  overflowTabIds.value = tabList
-    .filter(tab => hidden.has(tab.name))
-    .map(tab => tab.name)
-
-  await nextTick()
-  if (generation !== tabOverflowGeneration) return
-  await revealActiveTabIfClipped(wrap, tabList, generation)
 }
 
 /**
- * The overflow button is hidden while tabs are measured, then shown again.
- * If that button is wider than the reserved slot, the active tab can stay
- * clipped. Keep hiding leading tabs until it fits (or nothing else can hide).
+ * After the overflow control mounts, the active tab can still sit under it.
+ * Keep hiding leading tabs until it fits (or nothing else can hide).
  */
 const revealActiveTabIfClipped = async (
   wrap: HTMLElement,
