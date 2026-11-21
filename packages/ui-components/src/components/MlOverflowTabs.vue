@@ -177,6 +177,8 @@ const isMeasuring = ref(false)
 const tabButtonRefs = new Map<string, HTMLElement>()
 /** Last known positive widths; bridges transient 0-width measure frames. */
 const tabWidthCache = new Map<string, number>()
+/** Widths from the last successful measure; used by clip repair. */
+let lastTabWidths = new Map<string, number>()
 let tabOverflowFrame: number | undefined
 let tabOverflowObserver: ResizeObserver | undefined
 let tabOverflowGeneration = 0
@@ -240,6 +242,32 @@ const closeTab = (tabName: string) => {
   emit('tab-close', tabName)
 }
 
+/**
+ * Active tab is reserved first; remaining space is filled from the leading
+ * edge. Zero-width entries are treated as not fitting so a stale 0 cannot
+ * "use" free space and later blow the layout.
+ */
+const computeOverflowIds = (
+  tabList: MlOverflowTab[],
+  widths: Map<string, number>,
+  availableWidth: number,
+  activeId: string
+) => {
+  const hidden = new Set<string>()
+  const activeWidth = widths.get(activeId) ?? 0
+  let used = Math.min(Math.max(activeWidth, 0), availableWidth)
+  for (const tab of tabList) {
+    if (tab.name === activeId) continue
+    const width = widths.get(tab.name) ?? 0
+    if (width > 0 && used + width <= availableWidth) {
+      used += width
+    } else {
+      hidden.add(tab.name)
+    }
+  }
+  return tabList.filter(tab => hidden.has(tab.name)).map(tab => tab.name)
+}
+
 const scheduleUpdateTabOverflow = (options?: { resetRetries?: boolean }) => {
   if (options?.resetRetries !== false) tabOverflowRetries = 0
   if (tabOverflowFrame !== undefined) return
@@ -272,6 +300,10 @@ const updateTabOverflow = async () => {
   // would tear down an open overflow menu mid-selection).
   isMeasuring.value = true
   await nextTick()
+  // Wait for layout after un-hiding so offsetWidth is not a stale 0.
+  await new Promise<void>(resolve => {
+    requestAnimationFrame(() => resolve())
+  })
   // A newer selection started while we were waiting. Its pass owns measuring.
   if (generation !== tabOverflowGeneration) return
 
@@ -298,6 +330,7 @@ const updateTabOverflow = async () => {
       return
     }
     tabOverflowRetries = 0
+    lastTabWidths = widths
 
     const totalWidth = tabList.reduce(
       (sum, tab) => sum + (widths.get(tab.name) ?? 0),
@@ -319,52 +352,26 @@ const updateTabOverflow = async () => {
 
     const activeId = activeTab.value || tabList[0].name
     // listWidth already excludes a visible »; otherwise reserve one.
-    const availableWidth = overflowBtnShown
-      ? listWidth
-      : Math.max(0, listWidth - OVERFLOW_BTN_WIDTH)
-    const visible = new Set(tabList.map(tab => tab.name))
-    const hidden = new Set<string>()
-
-    const sumVisibleWidth = () =>
-      tabList
-        .filter(tab => visible.has(tab.name))
-        .reduce((sum, tab) => sum + (widths.get(tab.name) ?? 0), 0)
-
-    while (visible.size > 1 && sumVisibleWidth() > availableWidth) {
-      let hideId: string | undefined
-      for (let index = tabList.length - 1; index >= 0; index -= 1) {
-        const id = tabList[index].name
-        if (id === activeId || !visible.has(id)) continue
-        hideId = id
-        break
-      }
-      if (!hideId) break
-      visible.delete(hideId)
-      hidden.add(hideId)
-    }
-
-    if (!visible.has(activeId)) {
-      hidden.delete(activeId)
-      visible.add(activeId)
-      while (visible.size > 1 && sumVisibleWidth() > availableWidth) {
-        let hideId: string | undefined
-        for (let index = tabList.length - 1; index >= 0; index -= 1) {
-          const id = tabList[index].name
-          if (id === activeId || !visible.has(id)) continue
-          hideId = id
-          break
-        }
-        if (!hideId) break
-        visible.delete(hideId)
-        hidden.add(hideId)
-      }
-    }
+    // Small slack avoids a late active tab sitting 1–2px under the ».
+    const availableWidth = Math.max(
+      0,
+      (overflowBtnShown ? listWidth : listWidth - OVERFLOW_BTN_WIDTH) - 4
+    )
 
     if (generation !== tabOverflowGeneration) return
-    overflowTabIds.value = tabList
-      .filter(tab => hidden.has(tab.name))
-      .map(tab => tab.name)
+    const nextOverflow = computeOverflowIds(
+      tabList,
+      widths,
+      availableWidth,
+      activeId
+    )
+    overflowTabIds.value = nextOverflow
 
+    // Clip checks must run with the real hidden set applied. While
+    // isMeasuring is true every tab is shown, so the active tab's
+    // getBoundingClientRect sits far past the list and the repair
+    // collapses the strip to only that tab (Agent/Script).
+    isMeasuring.value = false
     await nextTick()
     if (generation !== tabOverflowGeneration) return
     await revealActiveTabIfClipped(wrap, tabList, generation)
@@ -377,7 +384,8 @@ const updateTabOverflow = async () => {
 
 /**
  * After the overflow control mounts, the active tab can still sit under it.
- * Keep hiding leading tabs until it fits (or nothing else can hide).
+ * Recompute with a tighter budget instead of stripping leading tabs (which
+ * previously left only Agent/Script on the strip).
  */
 const revealActiveTabIfClipped = async (
   wrap: HTMLElement,
@@ -394,12 +402,15 @@ const revealActiveTabIfClipped = async (
     if (!activeEl || activeEl.hidden) return
     const listRight = list.getBoundingClientRect().right
     const tabRight = activeEl.getBoundingClientRect().right
-    if (tabRight <= listRight + 1) return
-    const leftmost = tabList.find(
-      tab => tab.name !== activeId && !overflowTabIds.value.includes(tab.name)
+    const overflowPx = tabRight - listRight
+    if (overflowPx <= 1) return
+    const tighter = Math.max(0, list.clientWidth - overflowPx - 4)
+    overflowTabIds.value = computeOverflowIds(
+      tabList,
+      lastTabWidths,
+      tighter,
+      activeId || tabList[0].name
     )
-    if (!leftmost) return
-    overflowTabIds.value = [...overflowTabIds.value, leftmost.name]
     await nextTick()
   }
 }
