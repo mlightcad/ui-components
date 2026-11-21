@@ -14,6 +14,7 @@
             class="ml-overflow-tab"
             role="tab"
             :hidden="!isMeasuring && overflowTabIds.includes(tab.name)"
+            :style="{ order: tabFlexOrder(tab.name) }"
             :aria-selected="activeTab === tab.name"
             :class="{ 'is-active': activeTab === tab.name }"
             @click="selectTab(tab.name)"
@@ -174,6 +175,12 @@ const overflowTabIds = ref<string[]>([])
  * (`v-show`) and drops the overflow selection before it commits.
  */
 const isMeasuring = ref(false)
+/**
+ * When the active tab was brought in from the » menu (it is not inside the
+ * natural leading window), pin it as the rightmost visible tab — same as
+ * Chrome DevTools' overflow strip.
+ */
+const pinActiveToEnd = ref(false)
 const tabButtonRefs = new Map<string, HTMLElement>()
 /** Last known positive widths; bridges transient 0-width measure frames. */
 const tabWidthCache = new Map<string, number>()
@@ -191,6 +198,14 @@ const overflowTabs = computed(() => {
 const overflowContainsActive = computed(() => {
   return overflowTabIds.value.includes(activeTab.value)
 })
+
+/** Flex order so a »-selected tab paints as the last title before ». */
+const tabFlexOrder = (name: string) => {
+  const index = props.tabs.findIndex(tab => tab.name === name)
+  if (isMeasuring.value || !pinActiveToEnd.value) return index
+  if (name === activeTab.value) return 10_000
+  return index
+}
 
 const setTabButtonRef = (name: string, el: unknown) => {
   // Vue calls the previous inline ref with null when its identity changes.
@@ -243,29 +258,57 @@ const closeTab = (tabName: string) => {
 }
 
 /**
- * Active tab is reserved first; remaining space is filled from the leading
- * edge. Zero-width entries are treated as not fitting so a stale 0 cannot
- * "use" free space and later blow the layout.
+ * Chrome DevTools-style strip:
+ * - Take a consecutive leading window that fits.
+ * - If the active tab is already in that window, keep natural order.
+ * - Otherwise pin the active tab as the last visible title (right before »)
+ *   and fill the remaining width with a leading prefix — so choosing from
+ *   » both activates the tab and makes it the last tab in the title bar.
  */
-const computeOverflowIds = (
+const computeOverflowLayout = (
   tabList: MlOverflowTab[],
   widths: Map<string, number>,
   availableWidth: number,
   activeId: string
 ) => {
-  const hidden = new Set<string>()
-  const activeWidth = widths.get(activeId) ?? 0
-  let used = Math.min(Math.max(activeWidth, 0), availableWidth)
+  const widthOf = (id: string) => widths.get(id) ?? 0
+
+  const leadingWindow: string[] = []
+  let used = 0
   for (const tab of tabList) {
-    if (tab.name === activeId) continue
-    const width = widths.get(tab.name) ?? 0
-    if (width > 0 && used + width <= availableWidth) {
-      used += width
-    } else {
-      hidden.add(tab.name)
-    }
+    const width = widthOf(tab.name)
+    if (width <= 0 || used + width > availableWidth) break
+    leadingWindow.push(tab.name)
+    used += width
   }
-  return tabList.filter(tab => hidden.has(tab.name)).map(tab => tab.name)
+
+  let visible: string[]
+  let pinToEnd = false
+  if (leadingWindow.includes(activeId)) {
+    visible = leadingWindow
+  } else {
+    pinToEnd = true
+    const activeWidth = widthOf(activeId)
+    const budget = Math.max(0, availableWidth - activeWidth)
+    const lead: string[] = []
+    used = 0
+    for (const tab of tabList) {
+      if (tab.name === activeId) continue
+      const width = widthOf(tab.name)
+      if (width <= 0 || used + width > budget) break
+      lead.push(tab.name)
+      used += width
+    }
+    visible = [...lead, activeId]
+  }
+
+  const visibleSet = new Set(visible)
+  return {
+    overflowIds: tabList
+      .filter(tab => !visibleSet.has(tab.name))
+      .map(tab => tab.name),
+    pinActiveToEnd: pinToEnd
+  }
 }
 
 const scheduleUpdateTabOverflow = (options?: { resetRetries?: boolean }) => {
@@ -347,6 +390,7 @@ const updateTabOverflow = async () => {
     if (totalWidth <= tabsBudgetWithoutOverflowBtn) {
       if (generation !== tabOverflowGeneration) return
       overflowTabIds.value = []
+      pinActiveToEnd.value = false
       return
     }
 
@@ -359,13 +403,14 @@ const updateTabOverflow = async () => {
     )
 
     if (generation !== tabOverflowGeneration) return
-    const nextOverflow = computeOverflowIds(
+    const layout = computeOverflowLayout(
       tabList,
       widths,
       availableWidth,
       activeId
     )
-    overflowTabIds.value = nextOverflow
+    overflowTabIds.value = layout.overflowIds
+    pinActiveToEnd.value = layout.pinActiveToEnd
 
     // Clip checks must run with the real hidden set applied. While
     // isMeasuring is true every tab is shown, so the active tab's
@@ -384,8 +429,7 @@ const updateTabOverflow = async () => {
 
 /**
  * After the overflow control mounts, the active tab can still sit under it.
- * Recompute with a tighter budget instead of stripping leading tabs (which
- * previously left only Agent/Script on the strip).
+ * Recompute with a tighter budget (same Chrome-style layout).
  */
 const revealActiveTabIfClipped = async (
   wrap: HTMLElement,
@@ -405,12 +449,14 @@ const revealActiveTabIfClipped = async (
     const overflowPx = tabRight - listRight
     if (overflowPx <= 1) return
     const tighter = Math.max(0, list.clientWidth - overflowPx - 4)
-    overflowTabIds.value = computeOverflowIds(
+    const layout = computeOverflowLayout(
       tabList,
       lastTabWidths,
       tighter,
       activeId || tabList[0].name
     )
+    overflowTabIds.value = layout.overflowIds
+    pinActiveToEnd.value = layout.pinActiveToEnd
     await nextTick()
   }
 }
