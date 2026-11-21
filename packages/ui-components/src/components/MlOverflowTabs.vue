@@ -53,6 +53,7 @@
                 :key="tab.name"
                 :command="tab.name"
                 :class="{ 'is-selected': activeTab === tab.name }"
+                @click="selectTab(tab.name)"
               >
                 <span class="ml-overflow-tab-overflow-item">
                   <span class="ml-overflow-tab-label">{{ tab.label }}</span>
@@ -213,6 +214,8 @@ const isTabClosable = (tab: MlOverflowTab) => {
 }
 
 const selectTab = (tabName: unknown) => {
+  // ElDropdown @command may forward (command, instance, event); only the
+  // command string is meaningful here.
   if (typeof tabName !== 'string') return
   if (!props.tabs.some(tab => tab.name === tabName)) return
   // Show the chosen tab before the async measure. Selecting the tab that
@@ -221,7 +224,10 @@ const selectTab = (tabName: unknown) => {
   if (overflowTabIds.value.includes(tabName)) {
     overflowTabIds.value = overflowTabIds.value.filter(id => id !== tabName)
   }
-  activeTab.value = tabName
+  if (activeTab.value !== tabName) {
+    activeTab.value = tabName
+  }
+  // Always remeasure: same-value selects still need the active tab unhidden.
   rescheduleUpdateTabOverflow({ resetRetries: true })
 }
 
